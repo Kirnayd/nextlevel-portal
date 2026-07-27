@@ -1,0 +1,21 @@
+import { MAX_ATTACHMENT_SIZE_BYTES } from "@/shared/lib/constants";
+
+export const PRICE_STORAGE_BUCKET = "portal-files";
+export const PRICE_STORAGE_PREFIX = "price";
+export const PRICE_CATEGORY = "price" as const;
+
+export const PRICE_ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+] as const;
+
+export type PriceAllowedMimeType = (typeof PRICE_ALLOWED_MIME_TYPES)[number];
+
+export const PRICE_ALLOWED_EXTENSIONS = [".pdf", ".xlsx"] as const;
+
+export const PRICE_MAX_SIZE_BYTES = MAX_ATTACHMENT_SIZE_BYTES;
+
+export const PRICE_MIME_TYPE_LABELS: Record<PriceAllowedMimeType, string> = {
+  "application/pdf": "PDF",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "Excel",
+};
