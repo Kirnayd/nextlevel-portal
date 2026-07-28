@@ -38,28 +38,32 @@ function AnnouncementCard({
 
   return (
     <Card>
-      <CardHeader className="space-y-3">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <AnnouncementCoverThumbnail images={announcement.images} />
-
+      <CardContent className="space-y-4 pt-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1">
-                <CardTitle className="text-lg">{announcement.title}</CardTitle>
-                <CardDescription>{formatPublishedAt(announcement.created_at)}</CardDescription>
-              </div>
+              <CardTitle className="text-xl font-bold leading-tight md:text-2xl">
+                {announcement.title}
+              </CardTitle>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 {announcement.is_pinned ? <PinnedBadge /> : null}
                 {isAdmin && !announcement.is_published ? <HiddenBadge /> : null}
               </div>
             </div>
-          </div>
-        </div>
-      </CardHeader>
 
-      <CardContent className="space-y-4">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed">{announcement.content}</p>
+            <CardDescription>{formatPublishedAt(announcement.created_at)}</CardDescription>
+
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+              {announcement.content}
+            </p>
+          </div>
+
+          <AnnouncementCoverThumbnail
+            images={announcement.images}
+            className="mx-auto md:ml-0 md:mr-0"
+          />
+        </div>
 
         {isAdmin ? (
           <AdminAnnouncementImages

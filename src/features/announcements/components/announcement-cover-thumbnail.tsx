@@ -12,11 +12,20 @@ export function AnnouncementCoverThumbnail({ images, className }: AnnouncementCo
   const coverImage = images[0];
 
   if (!coverImage) {
-    return <AnnouncementImagePlaceholder className={cn("max-w-[160px]", className)} />;
+    return (
+      <AnnouncementImagePlaceholder
+        className={cn("aspect-auto h-[160px] w-full max-w-[220px] shrink-0", className)}
+      />
+    );
   }
 
   return (
-    <div className={cn("relative aspect-[4/3] w-full max-w-[160px] overflow-hidden rounded-lg border", className)}>
+    <div
+      className={cn(
+        "relative h-[160px] w-full max-w-[220px] shrink-0 overflow-hidden rounded-lg border",
+        className,
+      )}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={getAnnouncementImageUrl(coverImage.id)}
