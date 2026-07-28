@@ -62,20 +62,21 @@ export function UserRow({ user, currentUserId }: UserRowProps) {
 
   async function handleSetPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setErrorMessage("");
     setSuccessMessage("");
     setIsSubmitting(true);
 
     try {
-      const result = await setUserPassword(user.id, new FormData(event.currentTarget));
+      const result = await setUserPassword(user.id, new FormData(form));
 
       if (!result.success) {
         setErrorMessage(result.error);
         return;
       }
 
-      event.currentTarget.reset();
-      setSuccessMessage("Новий пароль встановлено.");
+      form.reset();
+      setSuccessMessage("Пароль успішно змінено.");
       setIsSettingPassword(false);
       router.refresh();
     } catch (error) {
