@@ -25,13 +25,14 @@ export function QuestionForm({ onCancel }: QuestionFormProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
 
     setErrorMessage("");
     setSuccessMessage("");
     setIsSubmitting(true);
 
     try {
-      const formData = new FormData(event.currentTarget);
+      const formData = new FormData(form);
       const result = await createQuestion(formData);
 
       if (!result.success) {
@@ -39,8 +40,8 @@ export function QuestionForm({ onCancel }: QuestionFormProps) {
         return;
       }
 
-      event.currentTarget.reset();
-      setSuccessMessage("Запитання надіслано.");
+      form.reset();
+      setSuccessMessage("Запитання успішно надіслано");
       router.refresh();
 
       if (onCancel) {
