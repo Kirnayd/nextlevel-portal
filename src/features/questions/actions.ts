@@ -9,6 +9,7 @@ import {
   type QuestionFilter,
 } from "@/features/questions/constants";
 import { notifyQuestionAnswered } from "@/infrastructure/push/triggers";
+import { createAdminClient } from "@/infrastructure/supabase/admin";
 import { createClient } from "@/infrastructure/supabase/server";
 import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
 import type { Enums, Tables, TablesInsert } from "@/shared/types/database.types";
@@ -317,4 +318,40 @@ export async function submitAnswer(
   }
 
   return { success: true, pushWarning };
+}
+
+export async function deleteQuestion(questionId: string): Promise<ActionResult> {
+  const user = await getAuthenticatedUser();
+
+  if (!user) {
+    return { success: false, error: "Увійдіть у систему." };
+  }
+
+  if (!(await isAdmin(user.id))) {
+    return { success: false, error: "Лише адміністратор може видаляти запитання." };
+  }
+
+  if (!questionId) {
+    return { success: false, error: "Запитання не знайдено." };
+  }
+
+  const admin = createAdminClient();
+
+  const { error: answerError } = await admin.from("answers").delete().eq("question_id", questionId);
+
+  if (answerError) {
+    console.error("Failed to delete question answers:", answerError.message);
+    return { success: false, error: "Не вдалося видалити запитання." };
+  }
+
+  const { error: questionError } = await admin.from("questions").delete().eq("id", questionId);
+
+  if (questionError) {
+    console.error("Failed to delete question:", questionError.message);
+    return { success: false, error: "Не вдалося видалити запитання." };
+  }
+
+  revalidatePath("/questions");
+
+  return { success: true };
 }

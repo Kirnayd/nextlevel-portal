@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { QuestionWithAnswer } from "@/features/questions/actions";
+import { AdminQuestionDelete } from "@/features/questions/components/admin-question-delete";
 import { QuestionStatusBadge } from "@/features/questions/components/question-status-badge";
 import {
   Card,
@@ -46,12 +47,29 @@ function getAuthorLabel(question: QuestionWithAnswer): string {
   return "Невідомий співробітник";
 }
 
+function QuestionToast({ message }: { message: string }) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div
+      role="status"
+      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-50 w-[min(calc(100%-2rem),24rem)] -translate-x-1/2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 shadow-lg dark:text-emerald-300"
+    >
+      {message}
+    </div>
+  );
+}
+
 function QuestionCard({
   question,
   isAdmin,
+  onQuestionDeleted,
 }: {
   question: QuestionWithAnswer;
   isAdmin: boolean;
+  onQuestionDeleted: (questionId: string) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(isAdmin && question.status !== "answered");
 
@@ -63,7 +81,13 @@ function QuestionCard({
             <CardTitle className="text-lg">{question.subject}</CardTitle>
             <CardDescription>{formatCreatedAt(question.created_at)}</CardDescription>
           </div>
-          <QuestionStatusBadge status={question.status} />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <QuestionStatusBadge status={question.status} />
+            {isAdmin ? (
+              <AdminQuestionDelete questionId={question.id} onDeleted={onQuestionDeleted} />
+            ) : null}
+          </div>
         </div>
 
         {isAdmin ? (
@@ -114,7 +138,33 @@ function QuestionCard({
 }
 
 export function QuestionList({ questions, isAdmin }: QuestionListProps) {
-  if (questions.length === 0) {
+  const [items, setItems] = useState(questions);
+  const [toastMessage, setToastMessage] = useState("");
+
+  useEffect(() => {
+    setItems(questions);
+  }, [questions]);
+
+  useEffect(() => {
+    if (!toastMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setToastMessage("");
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [toastMessage]);
+
+  function handleQuestionDeleted(questionId: string) {
+    setItems((current) => current.filter((question) => question.id !== questionId));
+    setToastMessage("Запитання видалено.");
+  }
+
+  if (items.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -130,10 +180,19 @@ export function QuestionList({ questions, isAdmin }: QuestionListProps) {
   }
 
   return (
-    <div className="space-y-4">
-      {questions.map((question) => (
-        <QuestionCard key={question.id} question={question} isAdmin={isAdmin} />
-      ))}
-    </div>
+    <>
+      <div className="space-y-4">
+        {items.map((question) => (
+          <QuestionCard
+            key={question.id}
+            question={question}
+            isAdmin={isAdmin}
+            onQuestionDeleted={handleQuestionDeleted}
+          />
+        ))}
+      </div>
+
+      <QuestionToast message={toastMessage} />
+    </>
   );
 }
