@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { deleteQuestion } from "@/features/questions/actions";
 import { DeleteQuestionDialog } from "@/features/questions/components/delete-question-dialog";
@@ -12,6 +13,7 @@ type AdminQuestionDeleteProps = {
 };
 
 export function AdminQuestionDelete({ questionId, onDeleted }: AdminQuestionDeleteProps) {
+  const router = useRouter();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -30,6 +32,7 @@ export function AdminQuestionDelete({ questionId, onDeleted }: AdminQuestionDele
 
       setIsDialogOpen(false);
       onDeleted(questionId);
+      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час видалення.";

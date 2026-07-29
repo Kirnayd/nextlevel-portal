@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { submitAnswer, takeQuestionInProgress } from "@/features/questions/actions";
 import type { QuestionWithAnswer } from "@/features/questions/actions";
@@ -17,6 +18,7 @@ type AdminQuestionActionsProps = {
 };
 
 export function AdminQuestionActions({ question }: AdminQuestionActionsProps) {
+  const router = useRouter();
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmittingAnswer, setIsSubmittingAnswer] = useState(false);
@@ -36,6 +38,7 @@ export function AdminQuestionActions({ question }: AdminQuestionActionsProps) {
       }
 
       setSuccessMessage("Статус змінено на «В роботі».");
+      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час оновлення статусу.";
@@ -69,6 +72,8 @@ export function AdminQuestionActions({ question }: AdminQuestionActionsProps) {
       if (result.pushWarning) {
         setSuccessMessage((current) => `${current} ${result.pushWarning}`);
       }
+
+      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час збереження відповіді.";

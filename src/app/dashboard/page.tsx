@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { getNewQuestionsCount } from "@/features/questions/actions";
+import { QuestionsNavLink } from "@/features/questions/components/questions-nav-link";
 import { PushNotificationSettings } from "@/shared/components/pwa/push-notification-settings";
 import { getSessionContext } from "@/shared/lib/auth";
 
@@ -12,6 +14,7 @@ export default async function DashboardPage() {
   }
 
   const { user, isAdmin: userIsAdmin } = session;
+  const newQuestionsCount = userIsAdmin ? await getNewQuestionsCount() : 0;
 
   return (
     <main className="flex min-h-screen items-center justify-center">
@@ -50,13 +53,17 @@ export default async function DashboardPage() {
           >
             Документи
           </Link>
-          <Link
-            href="/questions"
-            prefetch
-            className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            Запитання
-          </Link>
+          {userIsAdmin ? (
+            <QuestionsNavLink initialCount={newQuestionsCount} />
+          ) : (
+            <Link
+              href="/questions"
+              prefetch
+              className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Запитання
+            </Link>
+          )}
           {userIsAdmin ? (
             <Link
               href="/users"

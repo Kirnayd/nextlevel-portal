@@ -31,6 +31,11 @@ type ActionResult =
   | { success: true; pushWarning?: string }
   | { success: false; error: string };
 
+function revalidateQuestionPaths(): void {
+  revalidatePath("/questions");
+  revalidatePath("/dashboard");
+}
+
 type RawQuestionRow = Question & {
   answers: Answer[] | null;
 };
@@ -129,6 +134,28 @@ export async function getQuestions(
   return mapQuestionsWithAnswers(rows, authorsById);
 }
 
+export async function getNewQuestionsCount(): Promise<number> {
+  const user = await getAuthenticatedUser();
+
+  if (!user || !(await isAdmin(user.id))) {
+    return 0;
+  }
+
+  const supabase = await createClient();
+
+  const { count, error } = await supabase
+    .from("questions")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "new" satisfies Enums<"question_status">);
+
+  if (error) {
+    console.error("Failed to count new questions:", error.message);
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
 function validateQuestionInput(subject: string, message: string): string | null {
   if (!subject.trim()) {
     return "Вкажіть тему запитання.";
@@ -180,7 +207,7 @@ export async function createQuestion(formData: FormData): Promise<ActionResult> 
     return { success: false, error: "Не вдалося надіслати запитання. Спробуйте ще раз." };
   }
 
-  revalidatePath("/questions");
+  revalidateQuestionPaths();
 
   return { success: true };
 }
@@ -213,7 +240,7 @@ export async function takeQuestionInProgress(questionId: string): Promise<Action
     return { success: false, error: "Не вдалося оновити статус запитання." };
   }
 
-  revalidatePath("/questions");
+  revalidateQuestionPaths();
 
   return { success: true };
 }
@@ -303,7 +330,7 @@ export async function submitAnswer(
     return { success: false, error: "Відповідь збережено, але не вдалося оновити статус." };
   }
 
-  revalidatePath("/questions");
+  revalidateQuestionPaths();
 
   let pushWarning: string | undefined;
 
@@ -351,7 +378,7 @@ export async function deleteQuestion(questionId: string): Promise<ActionResult> 
     return { success: false, error: "Не вдалося видалити запитання." };
   }
 
-  revalidatePath("/questions");
+  revalidateQuestionPaths();
 
   return { success: true };
 }
