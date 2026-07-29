@@ -21,9 +21,3 @@ export const PRICE_MIME_TYPE_LABELS: Record<PriceAllowedMimeType, string> = {
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "Excel",
   "application/vnd.ms-excel": "Excel",
 };
-
-export const EXCEL_VIEWER_MAX_ROWS = 5000;
-export const EXCEL_VIEWER_MAX_COLS = 200;
-export const EXCEL_VIEWER_MAX_CELLS = 200_000;
-export const EXCEL_VIEWER_ROW_HEIGHT = 32;
-export const EXCEL_VIEWER_OVERSCAN = 12;

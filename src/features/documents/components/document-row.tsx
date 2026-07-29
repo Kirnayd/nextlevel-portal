@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Download, ExternalLink, FileText } from "lucide-react";
+import { ExternalLink, FileText } from "lucide-react";
 
 import type { Document, DocumentCategoryWithDocuments } from "@/features/documents/actions";
 import {
@@ -10,7 +10,7 @@ import {
   getMimeTypeLabel,
 } from "@/features/documents/lib/format";
 import { FileOpenTrigger } from "@/shared/components/file-viewer/file-open-trigger";
-import { isPdfMimeType } from "@/shared/lib/file-types";
+import { canOpenInViewer } from "@/shared/lib/file-preview";
 
 const AdminDocumentActions = dynamic(
   () =>
@@ -26,14 +26,10 @@ type DocumentRowProps = {
   isAdmin: boolean;
 };
 
-function isPdfDocument(mimeType: string): boolean {
-  return isPdfMimeType(mimeType);
-}
-
 export function DocumentRow({ document, categories, isAdmin }: DocumentRowProps) {
   const downloadUrl = `/api/documents/download?id=${document.id}`;
-  const isPdf = isPdfDocument(document.mime_type);
   const fileTypeLabel = getMimeTypeLabel(document.mime_type);
+  const canOpen = canOpenInViewer(document.mime_type);
 
   return (
     <div className="rounded-lg border bg-card p-4">
@@ -44,7 +40,7 @@ export function DocumentRow({ document, categories, isAdmin }: DocumentRowProps)
             <p className="font-medium">{document.title}</p>
             <p className="truncate text-sm text-muted-foreground">{document.original_filename}</p>
             <p className="text-sm text-muted-foreground">
-              {getMimeTypeLabel(document.mime_type)} · {formatFileSize(document.size_bytes)}
+              {fileTypeLabel} · {formatFileSize(document.size_bytes)}
             </p>
             <p className="text-sm text-muted-foreground">
               Завантажено: {formatUploadedAt(document.created_at)}
@@ -52,16 +48,17 @@ export function DocumentRow({ document, categories, isAdmin }: DocumentRowProps)
           </div>
         </div>
 
-        <FileOpenTrigger
-          downloadUrl={downloadUrl}
-          filename={document.original_filename}
-          mimeType={document.mime_type}
-          fileTypeLabel={fileTypeLabel}
-          sizeBytes={document.size_bytes}
-          label={isPdf ? "Відкрити PDF" : "Відкрити"}
-          icon={isPdf ? <ExternalLink /> : <Download />}
-          variant={isPdf ? "default" : "outline"}
-        />
+        {canOpen ? (
+          <FileOpenTrigger
+            downloadUrl={downloadUrl}
+            filename={document.original_filename}
+            mimeType={document.mime_type}
+            fileTypeLabel={fileTypeLabel}
+            sizeBytes={document.size_bytes}
+            label="Відкрити"
+            icon={<ExternalLink />}
+          />
+        ) : null}
       </div>
 
       {isAdmin ? (

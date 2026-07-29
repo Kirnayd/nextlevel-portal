@@ -3,19 +3,17 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, FileText, Share2 } from "lucide-react";
+import { Download, Share2 } from "lucide-react";
 
+import { PreviewFallbackPanel } from "@/shared/components/file-viewer/preview-fallback-panel";
 import { Button } from "@/shared/components/ui/button";
 import {
-  canPreviewInline,
-  formatFileSize,
-  isOfficeMimeType,
-} from "@/shared/lib/file-types";
-import {
-  downloadFileBlob,
-  fetchAuthenticatedFileBlob,
-  shareAuthenticatedFile,
-} from "@/shared/lib/share-file";
+  getDownloadLabel,
+  getFilePreviewMode,
+  getPreviewFallbackMessage,
+  type FilePreviewMode,
+} from "@/shared/lib/file-preview";
+import { fetchAuthenticatedFileBlob, shareAuthenticatedFile, downloadFileBlob } from "@/shared/lib/share-file";
 
 const PdfDocumentViewer = dynamic(
   () =>
@@ -32,6 +30,30 @@ const PdfDocumentViewer = dynamic(
   },
 );
 
+const ExcelSpreadsheetViewer = dynamic(
+  () =>
+    import("@/shared/components/file-viewer/excel-spreadsheet-viewer").then(
+      (module) => module.ExcelSpreadsheetViewer,
+    ),
+  { ssr: false, loading: () => null },
+);
+
+const WordDocumentViewer = dynamic(
+  () =>
+    import("@/shared/components/file-viewer/word-document-viewer").then(
+      (module) => module.WordDocumentViewer,
+    ),
+  { ssr: false, loading: () => null },
+);
+
+const PresentationViewer = dynamic(
+  () =>
+    import("@/shared/components/file-viewer/presentation-viewer").then(
+      (module) => module.PresentationViewer,
+    ),
+  { ssr: false, loading: () => null },
+);
+
 export type FileViewerProps = {
   open: boolean;
   onClose: () => void;
@@ -40,7 +62,17 @@ export type FileViewerProps = {
   mimeType: string;
   fileTypeLabel: string;
   sizeBytes?: number | null;
+  searchPlaceholder?: string;
+  loadingLabel?: string;
 };
+
+function isFallbackMode(mode: FilePreviewMode, showPresentationFallback: boolean): boolean {
+  return (
+    mode === "doc-fallback" ||
+    mode === "ppt-fallback" ||
+    (mode === "pptx" && showPresentationFallback)
+  );
+}
 
 export function FileViewer({
   open,
@@ -50,8 +82,13 @@ export function FileViewer({
   mimeType,
   fileTypeLabel,
   sizeBytes,
+  searchPlaceholder,
+  loadingLabel = "Завантаження документа...",
 }: FileViewerProps) {
   const titleId = useId();
+  const previewMode = getFilePreviewMode(mimeType);
+  const downloadLabel = getDownloadLabel(mimeType);
+
   const onCloseRef = useRef(onClose);
   const openRef = useRef(open);
   const historyActiveRef = useRef(false);
@@ -72,13 +109,13 @@ export function FileViewer({
   const [isSharing, setIsSharing] = useState(false);
   const [shareError, setShareError] = useState("");
   const [shareFallbackMessage, setShareFallbackMessage] = useState("");
+  const [contentStatusMessage, setContentStatusMessage] = useState("");
+  const [slideIndicator, setSlideIndicator] = useState<string | null>(null);
+  const [showPresentationFallback, setShowPresentationFallback] = useState(false);
+  const [excelTooLarge, setExcelTooLarge] = useState(false);
 
   onCloseRef.current = onClose;
   openRef.current = open;
-
-  const formattedSize = formatFileSize(sizeBytes);
-  const showInlinePreview = canPreviewInline(mimeType);
-  const showOfficeFallback = isOfficeMimeType(mimeType);
 
   const resetViewerState = useCallback(() => {
     fileBlobRef.current = null;
@@ -92,6 +129,10 @@ export function FileViewer({
     setIsSharing(false);
     setShareError("");
     setShareFallbackMessage("");
+    setContentStatusMessage("");
+    setSlideIndicator(null);
+    setShowPresentationFallback(false);
+    setExcelTooLarge(false);
   }, []);
 
   const closeViewer = useCallback(() => {
@@ -216,14 +257,19 @@ export function FileViewer({
       downloadFileBlob(blob, filename);
     } catch (error) {
       console.error("Download file error:", error);
-      setShareError("Не вдалося відкрити документ");
+      setShareError("Не вдалося завантажити файл.");
     }
   }, [ensureFileBlob, filename]);
 
-  const handlePdfLoadError = useCallback((message: string) => {
+  const handleContentError = useCallback((message: string) => {
+    console.error("File preview error:", message);
     setErrorMessage(message);
     setHasError(true);
   }, []);
+
+  const handlePdfLoadError = useCallback((message: string) => {
+    handleContentError(message);
+  }, [handleContentError]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -274,7 +320,7 @@ export function FileViewer({
   }, [open, closeViewer, resetViewerState]);
 
   useEffect(() => {
-    if (!open) {
+    if (!open || isFallbackMode(previewMode, showPresentationFallback)) {
       return;
     }
 
@@ -292,6 +338,10 @@ export function FileViewer({
       setRenderedPages(0);
       setShareError("");
       setShareFallbackMessage("");
+      setContentStatusMessage("");
+      setSlideIndicator(null);
+      setShowPresentationFallback(false);
+      setExcelTooLarge(false);
 
       try {
         const blob = await fetchAuthenticatedFileBlob(downloadUrl, controller.signal);
@@ -320,8 +370,9 @@ export function FileViewer({
     return () => {
       cancelled = true;
       controller.abort();
+      fileBlobRef.current = null;
     };
-  }, [open, downloadUrl]);
+  }, [open, downloadUrl, previewMode, showPresentationFallback]);
 
   const handleRenderProgress = useCallback((rendered: number, total: number) => {
     setRenderedPages(rendered);
@@ -333,30 +384,20 @@ export function FileViewer({
   }
 
   const pageIndicator =
-    showInlinePreview && totalPages > 0
-      ? `Сторінка ${currentPage} з ${totalPages}`
-      : null;
+    previewMode === "pdf" && totalPages > 0 ? `Сторінка ${currentPage} з ${totalPages}` : null;
 
   const renderProgress =
-    showInlinePreview && totalPages > 0 && renderedPages < totalPages
+    previewMode === "pdf" && totalPages > 0 && renderedPages < totalPages
       ? `Завантаження... ${renderedPages}/${totalPages}`
       : null;
 
-  const errorActions = (
-    <div className="flex flex-wrap justify-center gap-3">
-      <Button type="button" onClick={() => void handleDownload()}>
-        <Download />
-        Завантажити файл
-      </Button>
-      <Button type="button" variant="outline" disabled={isSharing} onClick={() => void handleShare()}>
-        <Share2 />
-        {isSharing ? "Підготовка файлу..." : "Поділитися"}
-      </Button>
-      <Button type="button" variant="outline" onClick={handleClose}>
-        ✕ Закрити
-      </Button>
-    </div>
+  const secondaryIndicator = slideIndicator ?? contentStatusMessage ?? null;
+  const showFallback = isFallbackMode(previewMode, showPresentationFallback);
+  const fallbackMessage = getPreviewFallbackMessage(
+    previewMode === "pptx" && showPresentationFallback ? "pptx" : previewMode,
   );
+
+  const toolbarDisabled = isLoading || isSharing;
 
   return createPortal(
     <div
@@ -383,6 +424,9 @@ export function FileViewer({
               {renderProgress ? (
                 <p className="text-xs text-muted-foreground">{renderProgress}</p>
               ) : null}
+              {secondaryIndicator ? (
+                <p className="text-xs text-muted-foreground">{secondaryIndicator}</p>
+              ) : null}
             </div>
 
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -390,11 +434,21 @@ export function FileViewer({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={isLoading || isSharing}
+                disabled={toolbarDisabled}
                 onClick={() => void handleShare()}
               >
                 <Share2 className="size-4" />
                 {isSharing ? "Підготовка файлу..." : "Поділитися"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={toolbarDisabled}
+                onClick={() => void handleDownload()}
+              >
+                <Download className="size-4" />
+                {downloadLabel}
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={handleClose}>
                 ✕ Закрити
@@ -419,30 +473,38 @@ export function FileViewer({
       <div
         ref={contentRef}
         className={
-          showInlinePreview
-            ? "min-h-0 flex-1 overflow-hidden pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] touch-auto"
-            : "min-h-0 flex-1 overflow-auto pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
+          previewMode === "pdf"
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-3 touch-auto"
+            : "flex min-h-0 flex-1 flex-col overflow-hidden pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-3"
         }
-        onTouchStart={showInlinePreview ? undefined : handleSwipeTouchStart}
-        onTouchEnd={showInlinePreview ? undefined : handleSwipeTouchEnd}
+        onTouchStart={previewMode === "pdf" ? undefined : handleSwipeTouchStart}
+        onTouchEnd={previewMode === "pdf" ? undefined : handleSwipeTouchEnd}
       >
         {isLoading ? (
-          <div className="flex min-h-[50dvh] items-center justify-center px-4 text-sm text-muted-foreground">
-            Завантаження документа...
+          <div className="flex min-h-[50dvh] flex-1 items-center justify-center px-4 text-sm text-muted-foreground">
+            {loadingLabel}
           </div>
         ) : null}
 
         {hasError ? (
-          <div className="flex min-h-[50dvh] flex-col items-center justify-center gap-4 px-4 text-center">
+          <div className="flex min-h-[50dvh] flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
             <p className="text-sm text-destructive">Не вдалося відкрити документ</p>
             {errorMessage ? (
               <p className="max-w-lg break-words text-xs text-muted-foreground">{errorMessage}</p>
             ) : null}
-            {errorActions}
           </div>
         ) : null}
 
-        {!isLoading && !hasError && showInlinePreview && fileBlob ? (
+        {!isLoading && !hasError && showFallback ? (
+          <PreviewFallbackPanel
+            filename={filename}
+            fileTypeLabel={fileTypeLabel}
+            sizeBytes={sizeBytes}
+            message={fallbackMessage}
+          />
+        ) : null}
+
+        {!isLoading && !hasError && !showFallback && previewMode === "pdf" && fileBlob ? (
           <PdfDocumentViewer
             fileBlob={fileBlob}
             onCurrentPageChange={setCurrentPage}
@@ -451,52 +513,69 @@ export function FileViewer({
           />
         ) : null}
 
-        {!isLoading && !hasError && showOfficeFallback ? (
-          <div className="mx-auto flex w-full max-w-lg flex-col gap-6 py-8">
-            <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-4">
-              <FileText className="mt-0.5 size-5 shrink-0 text-primary" />
-              <div className="min-w-0 space-y-1">
-                <p className="break-words font-medium">{filename}</p>
-                <p className="text-sm text-muted-foreground">{fileTypeLabel}</p>
-                {formattedSize ? (
-                  <p className="text-sm text-muted-foreground">{formattedSize}</p>
-                ) : null}
-              </div>
-            </div>
-
-            <p className="text-sm text-muted-foreground">
-              Попередній перегляд цього формату недоступний.
-            </p>
-
-            <div className="flex flex-wrap gap-3">
-              <Button
-                type="button"
-                disabled={isSharing}
-                onClick={() => void handleShare()}
-              >
-                <Share2 />
-                {isSharing ? "Підготовка файлу..." : "Поділитися"}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => void handleDownload()}>
-                <Download />
-                Завантажити файл
-              </Button>
-              <Button type="button" variant="outline" onClick={handleClose}>
-                ✕ Закрити
-              </Button>
-            </div>
-          </div>
+        {!isLoading && !hasError && !showFallback && previewMode === "excel" && fileBlob ? (
+          excelTooLarge ? (
+            <PreviewFallbackPanel
+              filename={filename}
+              fileTypeLabel={fileTypeLabel}
+              sizeBytes={sizeBytes}
+              message="Файл завеликий для перегляду в браузері."
+            />
+          ) : (
+            <ExcelSpreadsheetViewer
+              fileBlob={fileBlob}
+              searchPlaceholder={searchPlaceholder}
+              loadingLabel={loadingLabel}
+              onStatusChange={(status) => {
+                setContentStatusMessage(status.message ?? "");
+                if (status.phase === "too-large") {
+                  setExcelTooLarge(true);
+                }
+                if (status.phase === "error") {
+                  handleContentError("Не вдалося відкрити документ");
+                }
+              }}
+              onLoadError={() => handleContentError("Не вдалося відкрити документ")}
+            />
+          )
         ) : null}
 
-        {!isLoading && !hasError && !showInlinePreview && !showOfficeFallback ? (
-          <div className="flex min-h-[50dvh] flex-col items-center justify-center gap-4 px-4 py-8 text-center">
-            <p className="break-words font-medium">{filename}</p>
-            <p className="text-sm text-muted-foreground">{fileTypeLabel}</p>
-            <Button type="button" onClick={() => void handleDownload()}>
-              <Download />
-              Завантажити файл
-            </Button>
-          </div>
+        {!isLoading && !hasError && !showFallback && previewMode === "docx" && fileBlob ? (
+          <WordDocumentViewer
+            fileBlob={fileBlob}
+            onStatusChange={(status) => {
+              setContentStatusMessage(status.message ?? "");
+            }}
+            onLoadError={() => handleContentError("Не вдалося відкрити документ")}
+          />
+        ) : null}
+
+        {!isLoading && !hasError && !showFallback && previewMode === "pptx" && fileBlob ? (
+          <PresentationViewer
+            fileBlob={fileBlob}
+            onStatusChange={(status) => {
+              setSlideIndicator(status.slideIndicator ?? null);
+              setContentStatusMessage(status.message ?? "");
+              if (status.phase === "fallback") {
+                setShowPresentationFallback(true);
+              }
+            }}
+            onLoadError={() => setShowPresentationFallback(true)}
+            onFallback={() => setShowPresentationFallback(true)}
+          />
+        ) : null}
+
+        {!isLoading &&
+        !hasError &&
+        !showFallback &&
+        previewMode === "unsupported" &&
+        fileBlob ? (
+          <PreviewFallbackPanel
+            filename={filename}
+            fileTypeLabel={fileTypeLabel}
+            sizeBytes={sizeBytes}
+            message="Попередній перегляд цього формату недоступний."
+          />
         ) : null}
       </div>
     </div>,

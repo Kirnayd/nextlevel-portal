@@ -22,6 +22,8 @@ type FileOpenTriggerProps = {
   icon?: ReactNode;
   variant?: "default" | "outline" | "destructive" | "secondary" | "ghost" | "link";
   className?: string;
+  searchPlaceholder?: string;
+  loadingLabel?: string;
 };
 
 export function FileOpenTrigger({
@@ -34,6 +36,8 @@ export function FileOpenTrigger({
   icon,
   variant = "default",
   className,
+  searchPlaceholder,
+  loadingLabel,
 }: FileOpenTriggerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const handleClose = useCallback(() => {
@@ -61,6 +65,8 @@ export function FileOpenTrigger({
           mimeType={mimeType}
           fileTypeLabel={fileTypeLabel}
           sizeBytes={sizeBytes}
+          searchPlaceholder={searchPlaceholder}
+          loadingLabel={loadingLabel}
         />
       ) : null}
     </>

@@ -4,7 +4,7 @@ import {
   EXCEL_VIEWER_MAX_CELLS,
   EXCEL_VIEWER_MAX_COLS,
   EXCEL_VIEWER_MAX_ROWS,
-} from "@/features/price/constants";
+} from "@/shared/lib/file-preview";
 
 export type WorksheetMerge = {
   row: number;
@@ -209,10 +209,7 @@ export type SearchMatch = {
   col: number;
 };
 
-export function searchWorksheet(
-  rows: string[][],
-  query: string,
-): SearchMatch[] {
+export function searchWorksheet(rows: string[][], query: string): SearchMatch[] {
   const normalizedQuery = query.trim().toLocaleLowerCase("uk-UA");
 
   if (!normalizedQuery) {
