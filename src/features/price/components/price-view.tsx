@@ -1,9 +1,8 @@
-import { Download, ExternalLink, FileSpreadsheet } from "lucide-react";
+import { FileSpreadsheet } from "lucide-react";
 
 import type { PriceFile } from "@/features/price/actions";
+import { PriceFileActions } from "@/features/price/components/price-file-actions";
 import { PRICE_MIME_TYPE_LABELS } from "@/features/price/constants";
-import { FileOpenTrigger } from "@/shared/components/file-viewer/file-open-trigger";
-import { isPdfMimeType } from "@/shared/lib/file-types";
 import {
   Card,
   CardContent,
@@ -51,7 +50,6 @@ export function PriceView({ priceFile }: PriceViewProps) {
     PRICE_MIME_TYPE_LABELS[
       priceFile.mime_type as keyof typeof PRICE_MIME_TYPE_LABELS
     ] ?? "Файл";
-  const isPdf = isPdfMimeType(priceFile.mime_type);
 
   return (
     <Card>
@@ -76,15 +74,7 @@ export function PriceView({ priceFile }: PriceViewProps) {
           </div>
         </div>
 
-        <FileOpenTrigger
-          downloadUrl="/api/price/download"
-          filename={priceFile.original_filename}
-          mimeType={priceFile.mime_type}
-          fileTypeLabel={fileTypeLabel}
-          sizeBytes={priceFile.size_bytes}
-          label={isPdf ? "Відкрити PDF" : "Відкрити файл"}
-          icon={isPdf ? <ExternalLink /> : <Download />}
-        />
+        <PriceFileActions priceFile={priceFile} />
       </CardContent>
     </Card>
   );

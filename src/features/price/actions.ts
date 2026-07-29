@@ -2,9 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createClient } from "@/infrastructure/supabase/server";
-import { createAdminClient } from "@/infrastructure/supabase/admin";
-import { notifyPriceUpdated } from "@/infrastructure/push/triggers";
 import {
   PRICE_ALLOWED_MIME_TYPES,
   PRICE_CATEGORY,
@@ -12,6 +9,9 @@ import {
   PRICE_STORAGE_BUCKET,
   PRICE_STORAGE_PREFIX,
 } from "@/features/price/constants";
+import { notifyPriceUpdated } from "@/infrastructure/push/triggers";
+import { createAdminClient } from "@/infrastructure/supabase/admin";
+import { createClient } from "@/infrastructure/supabase/server";
 import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
 import type { Tables, TablesInsert, TablesUpdate } from "@/shared/types/database.types";
 
@@ -73,7 +73,7 @@ export async function uploadPriceFile(formData: FormData): Promise<UploadPriceRe
   }
 
   if (!isAllowedMimeType(file.type)) {
-    return { success: false, error: "Дозволені лише файли Excel (.xlsx) або PDF." };
+    return { success: false, error: "Дозволені лише файли Excel (.xls, .xlsx) або PDF." };
   }
 
   const supabase = await createClient();

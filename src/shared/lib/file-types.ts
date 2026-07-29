@@ -2,6 +2,13 @@ export function isPdfMimeType(mimeType: string): boolean {
   return mimeType === "application/pdf";
 }
 
+export function isExcelMimeType(mimeType: string): boolean {
+  return (
+    mimeType === "application/vnd.ms-excel" ||
+    mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+}
+
 const OFFICE_MIME_TYPES = new Set([
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

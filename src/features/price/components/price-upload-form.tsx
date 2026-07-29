@@ -34,11 +34,13 @@ export function PriceUploadForm() {
         fileInputRef.current.value = "";
       }
 
-      setSuccessMessage("Прайс завантажено.");
+      let message = "Прайс завантажено.";
 
       if (result.pushWarning) {
-        setSuccessMessage((current) => `${current} ${result.pushWarning}`);
+        message = `${message} ${result.pushWarning}`;
       }
+
+      setSuccessMessage(message);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час завантаження.";
@@ -66,7 +68,7 @@ export function PriceUploadForm() {
           disabled={isUploading}
         />
         <p className="text-sm text-muted-foreground">
-          Дозволені формати: .xlsx, .pdf. Максимальний розмір: 25 МБ.
+          Дозволені формати: .xls, .xlsx, .pdf. Максимальний розмір: 25 МБ.
         </p>
       </div>
 
