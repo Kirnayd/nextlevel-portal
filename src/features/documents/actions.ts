@@ -7,6 +7,7 @@ import {
   DOCUMENTS_MAX_SIZE_BYTES,
   DOCUMENTS_STORAGE_BUCKET,
   DOCUMENT_TITLE_MAX_LENGTH,
+  SUBCATEGORY_NAME_MAX_LENGTH,
 } from "@/features/documents/constants";
 import {
   isAllowedDocumentExtension,
@@ -20,9 +21,16 @@ import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
 import type { Tables, TablesInsert, TablesUpdate } from "@/shared/types/database.types";
 
 export type DocumentCategory = Tables<"document_categories">;
+export type DocumentSubcategory = Tables<"document_subcategories">;
 export type Document = Tables<"documents">;
 
+export type DocumentSubcategoryWithDocuments = DocumentSubcategory & {
+  documents: Document[];
+};
+
 export type DocumentCategoryWithDocuments = DocumentCategory & {
+  subcategories: DocumentSubcategoryWithDocuments[];
+  uncategorizedDocuments: Document[];
   documents: Document[];
 };
 
@@ -50,6 +58,20 @@ function validateCategoryName(name: string): string | null {
 
   if (trimmed.length > CATEGORY_NAME_MAX_LENGTH) {
     return `Назва категорії не може перевищувати ${CATEGORY_NAME_MAX_LENGTH} символів.`;
+  }
+
+  return null;
+}
+
+function validateSubcategoryName(name: string): string | null {
+  const trimmed = name.trim();
+
+  if (!trimmed) {
+    return "Вкажіть назву підкатегорії.";
+  }
+
+  if (trimmed.length > SUBCATEGORY_NAME_MAX_LENGTH) {
+    return `Назва підкатегорії не може перевищувати ${SUBCATEGORY_NAME_MAX_LENGTH} символів.`;
   }
 
   return null;
@@ -96,10 +118,16 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
 
   const [
     { data: categories, error: categoriesError },
+    { data: subcategories, error: subcategoriesError },
     { data: documents, error: documentsError },
   ] = await Promise.all([
     supabase
       .from("document_categories")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
+      .from("document_subcategories")
       .select("*")
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
@@ -111,23 +139,58 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
     return [];
   }
 
+  if (subcategoriesError) {
+    console.error("Failed to load document subcategories:", subcategoriesError.message);
+    return [];
+  }
+
   if (documentsError) {
     console.error("Failed to load documents:", documentsError.message);
     return [];
   }
 
-  const documentsByCategory = new Map<string, Document[]>();
+  const documentsBySubcategory = new Map<string, Document[]>();
+  const uncategorizedByCategory = new Map<string, Document[]>();
 
   for (const document of (documents ?? []) as Document[]) {
-    const existing = documentsByCategory.get(document.category_id) ?? [];
+    if (document.subcategory_id) {
+      const existing = documentsBySubcategory.get(document.subcategory_id) ?? [];
+      existing.push(document);
+      documentsBySubcategory.set(document.subcategory_id, existing);
+      continue;
+    }
+
+    const existing = uncategorizedByCategory.get(document.category_id) ?? [];
     existing.push(document);
-    documentsByCategory.set(document.category_id, existing);
+    uncategorizedByCategory.set(document.category_id, existing);
   }
 
-  return ((categories ?? []) as DocumentCategory[]).map((category) => ({
-    ...category,
-    documents: documentsByCategory.get(category.id) ?? [],
-  }));
+  const subcategoriesByCategory = new Map<string, DocumentSubcategoryWithDocuments[]>();
+
+  for (const subcategory of (subcategories ?? []) as DocumentSubcategory[]) {
+    const existing = subcategoriesByCategory.get(subcategory.category_id) ?? [];
+    existing.push({
+      ...subcategory,
+      documents: documentsBySubcategory.get(subcategory.id) ?? [],
+    });
+    subcategoriesByCategory.set(subcategory.category_id, existing);
+  }
+
+  return ((categories ?? []) as DocumentCategory[]).map((category) => {
+    const categorySubcategories = subcategoriesByCategory.get(category.id) ?? [];
+    const uncategorizedDocuments = uncategorizedByCategory.get(category.id) ?? [];
+    const categoryDocuments = [
+      ...categorySubcategories.flatMap((subcategory) => subcategory.documents),
+      ...uncategorizedDocuments,
+    ];
+
+    return {
+      ...category,
+      subcategories: categorySubcategories,
+      uncategorizedDocuments,
+      documents: categoryDocuments,
+    };
+  });
 }
 
 export async function createCategory(formData: FormData): Promise<ActionResult> {
@@ -252,6 +315,23 @@ export async function deleteCategory(categoryId: string): Promise<ActionResult> 
     };
   }
 
+  const { count: subcategoryCount, error: subcategoryCountError } = await supabase
+    .from("document_subcategories")
+    .select("id", { count: "exact", head: true })
+    .eq("category_id", categoryId);
+
+  if (subcategoryCountError) {
+    console.error("Failed to count category subcategories:", subcategoryCountError.message);
+    return { success: false, error: "Не вдалося перевірити підкатегорії категорії." };
+  }
+
+  if ((subcategoryCount ?? 0) > 0) {
+    return {
+      success: false,
+      error: "Неможливо видалити категорію, у якій є підкатегорії.",
+    };
+  }
+
   const { error } = await supabase.from("document_categories").delete().eq("id", categoryId);
 
   if (error) {
@@ -273,6 +353,7 @@ export async function uploadDocument(formData: FormData): Promise<ActionResult> 
 
   const { user } = adminResult;
   const categoryId = String(formData.get("category_id") ?? "");
+  const subcategoryInput = String(formData.get("subcategory_id") ?? "").trim();
   const titleInput = String(formData.get("title") ?? "");
   const file = formData.get("file");
 
@@ -324,6 +405,29 @@ export async function uploadDocument(formData: FormData): Promise<ActionResult> 
     return { success: false, error: "Категорію не знайдено." };
   }
 
+  let subcategoryId: string | null = null;
+
+  if (subcategoryInput && subcategoryInput !== "none") {
+    const { data: subcategory, error: subcategoryError } = await supabase
+      .from("document_subcategories")
+      .select("id, category_id")
+      .eq("id", subcategoryInput)
+      .maybeSingle();
+
+    if (subcategoryError || !subcategory) {
+      return { success: false, error: "Підкатегорію не знайдено." };
+    }
+
+    if ((subcategory as { category_id: string }).category_id !== categoryId) {
+      return {
+        success: false,
+        error: "Обрана підкатегорія не належить до вибраної категорії.",
+      };
+    }
+
+    subcategoryId = (subcategory as { id: string }).id;
+  }
+
   const storagePath = buildDocumentStoragePath(categoryId, originalFilename);
   const fileBuffer = await file.arrayBuffer();
 
@@ -341,6 +445,7 @@ export async function uploadDocument(formData: FormData): Promise<ActionResult> 
 
   const insertPayload: TablesInsert<"documents"> = {
     category_id: categoryId,
+    subcategory_id: subcategoryId,
     title,
     storage_path: storagePath,
     original_filename: originalFilename,
@@ -416,6 +521,7 @@ export async function renameDocument(documentId: string, formData: FormData): Pr
 export async function moveDocument(
   documentId: string,
   targetCategoryId: string,
+  targetSubcategoryId: string | null,
 ): Promise<ActionResult> {
   const adminResult = await requireAdmin();
 
@@ -441,7 +547,12 @@ export async function moveDocument(
 
   const currentDocument = document as Document;
 
-  if (currentDocument.category_id === targetCategoryId) {
+  const normalizedTargetSubcategoryId = targetSubcategoryId || null;
+
+  if (
+    currentDocument.category_id === targetCategoryId &&
+    currentDocument.subcategory_id === normalizedTargetSubcategoryId
+  ) {
     return { success: true };
   }
 
@@ -455,23 +566,47 @@ export async function moveDocument(
     return { success: false, error: "Цільову категорію не знайдено." };
   }
 
-  const newStoragePath = buildDocumentStoragePath(
-    targetCategoryId,
-    currentDocument.original_filename,
-  );
+  if (normalizedTargetSubcategoryId) {
+    const { data: targetSubcategory, error: subcategoryError } = await supabase
+      .from("document_subcategories")
+      .select("id, category_id")
+      .eq("id", normalizedTargetSubcategoryId)
+      .maybeSingle();
 
-  const { error: moveError } = await supabase.storage
-    .from(DOCUMENTS_STORAGE_BUCKET)
-    .move(currentDocument.storage_path, newStoragePath);
+    if (subcategoryError || !targetSubcategory) {
+      return { success: false, error: "Цільову підкатегорію не знайдено." };
+    }
 
-  if (moveError) {
-    console.error("Failed to move document in storage:", moveError.message);
-    return { success: false, error: "Не вдалося перемістити файл у сховищі." };
+    if ((targetSubcategory as { category_id: string }).category_id !== targetCategoryId) {
+      return {
+        success: false,
+        error: "Обрана підкатегорія не належить до вибраної категорії.",
+      };
+    }
+  }
+
+  let nextStoragePath = currentDocument.storage_path;
+
+  if (currentDocument.category_id !== targetCategoryId) {
+    nextStoragePath = buildDocumentStoragePath(
+      targetCategoryId,
+      currentDocument.original_filename,
+    );
+
+    const { error: moveError } = await supabase.storage
+      .from(DOCUMENTS_STORAGE_BUCKET)
+      .move(currentDocument.storage_path, nextStoragePath);
+
+    if (moveError) {
+      console.error("Failed to move document in storage:", moveError.message);
+      return { success: false, error: "Не вдалося перемістити файл у сховищі." };
+    }
   }
 
   const updatePayload: TablesUpdate<"documents"> = {
     category_id: targetCategoryId,
-    storage_path: newStoragePath,
+    subcategory_id: normalizedTargetSubcategoryId,
+    storage_path: nextStoragePath,
   };
 
   const { error: updateError } = await supabase
@@ -480,9 +615,12 @@ export async function moveDocument(
     .eq("id", documentId);
 
   if (updateError) {
-    await supabase.storage
-      .from(DOCUMENTS_STORAGE_BUCKET)
-      .move(newStoragePath, currentDocument.storage_path);
+    if (currentDocument.category_id !== targetCategoryId) {
+      await supabase.storage
+        .from(DOCUMENTS_STORAGE_BUCKET)
+        .move(nextStoragePath, currentDocument.storage_path);
+    }
+
     console.error("Failed to update document category:", updateError.message);
     return { success: false, error: "Не вдалося оновити категорію документа." };
   }
@@ -594,6 +732,212 @@ export async function reorderCategories(categoryIds: string[]): Promise<ActionRe
   if (failedUpdate?.error) {
     console.error("Failed to reorder categories:", failedUpdate.error.message);
     return { success: false, error: "Не вдалося зберегти порядок категорій." };
+  }
+
+  revalidatePath("/documents");
+
+  return { success: true };
+}
+
+export async function createSubcategory(
+  categoryId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const adminResult = await requireAdmin();
+
+  if ("success" in adminResult) {
+    return adminResult;
+  }
+
+  if (!categoryId) {
+    return { success: false, error: "Категорію не знайдено." };
+  }
+
+  const name = String(formData.get("name") ?? "");
+  const validationError = validateSubcategoryName(name);
+
+  if (validationError) {
+    return { success: false, error: validationError };
+  }
+
+  const supabase = await createClient();
+
+  const { data: category, error: categoryError } = await supabase
+    .from("document_categories")
+    .select("id")
+    .eq("id", categoryId)
+    .maybeSingle();
+
+  if (categoryError || !category) {
+    return { success: false, error: "Категорію не знайдено." };
+  }
+
+  const { data: lastSubcategoryData, error: sortError } = await supabase
+    .from("document_subcategories")
+    .select("sort_order")
+    .eq("category_id", categoryId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (sortError) {
+    console.error("Failed to resolve subcategory sort order:", sortError.message);
+    return { success: false, error: "Не вдалося створити підкатегорію." };
+  }
+
+  const lastSubcategory = lastSubcategoryData as { sort_order: number } | null;
+
+  const insertPayload: TablesInsert<"document_subcategories"> = {
+    category_id: categoryId,
+    name: name.trim(),
+    sort_order: (lastSubcategory?.sort_order ?? -1) + 1,
+  };
+
+  const { error } = await supabase
+    .from("document_subcategories")
+    .insert(insertPayload as never);
+
+  if (error) {
+    if (error.code === "23505") {
+      return { success: false, error: "Підкатегорія з такою назвою вже існує в цій категорії." };
+    }
+
+    console.error("Failed to create subcategory:", error.message);
+    return { success: false, error: "Не вдалося створити підкатегорію." };
+  }
+
+  revalidatePath("/documents");
+
+  return { success: true };
+}
+
+export async function renameSubcategory(
+  subcategoryId: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const adminResult = await requireAdmin();
+
+  if ("success" in adminResult) {
+    return adminResult;
+  }
+
+  if (!subcategoryId) {
+    return { success: false, error: "Підкатегорію не знайдено." };
+  }
+
+  const name = String(formData.get("name") ?? "");
+  const validationError = validateSubcategoryName(name);
+
+  if (validationError) {
+    return { success: false, error: validationError };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("document_subcategories")
+    .update({ name: name.trim() } as never)
+    .eq("id", subcategoryId);
+
+  if (error) {
+    if (error.code === "23505") {
+      return { success: false, error: "Підкатегорія з такою назвою вже існує в цій категорії." };
+    }
+
+    console.error("Failed to rename subcategory:", error.message);
+    return { success: false, error: "Не вдалося перейменувати підкатегорію." };
+  }
+
+  revalidatePath("/documents");
+
+  return { success: true };
+}
+
+export async function deleteSubcategory(subcategoryId: string): Promise<ActionResult> {
+  const adminResult = await requireAdmin();
+
+  if ("success" in adminResult) {
+    return adminResult;
+  }
+
+  if (!subcategoryId) {
+    return { success: false, error: "Підкатегорію не знайдено." };
+  }
+
+  const supabase = await createClient();
+
+  const { count, error: countError } = await supabase
+    .from("documents")
+    .select("id", { count: "exact", head: true })
+    .eq("subcategory_id", subcategoryId);
+
+  if (countError) {
+    console.error("Failed to count subcategory documents:", countError.message);
+    return { success: false, error: "Не вдалося перевірити документи підкатегорії." };
+  }
+
+  if ((count ?? 0) > 0) {
+    return {
+      success: false,
+      error: "Неможливо видалити підкатегорію, поки в ній є документи.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("document_subcategories")
+    .delete()
+    .eq("id", subcategoryId);
+
+  if (error) {
+    console.error("Failed to delete subcategory:", error.message);
+    return { success: false, error: "Не вдалося видалити підкатегорію." };
+  }
+
+  revalidatePath("/documents");
+
+  return { success: true };
+}
+
+export async function reorderSubcategories(
+  categoryId: string,
+  subcategoryIds: string[],
+): Promise<ActionResult> {
+  const adminResult = await requireAdmin();
+
+  if ("success" in adminResult) {
+    return adminResult;
+  }
+
+  if (!categoryId) {
+    return { success: false, error: "Категорію не знайдено." };
+  }
+
+  if (subcategoryIds.length === 0) {
+    return { success: false, error: "Немає підкатегорій для сортування." };
+  }
+
+  const uniqueIds = new Set(subcategoryIds);
+
+  if (uniqueIds.size !== subcategoryIds.length) {
+    return { success: false, error: "Невірний порядок підкатегорій." };
+  }
+
+  const supabase = await createClient();
+
+  const updates = subcategoryIds.map((subcategoryId, index) =>
+    supabase
+      .from("document_subcategories")
+      .update({ sort_order: index } as never)
+      .eq("id", subcategoryId)
+      .eq("category_id", categoryId),
+  );
+
+  const results = await Promise.all(updates);
+  const failedUpdate = results.find((result) => result.error);
+
+  if (failedUpdate?.error) {
+    console.error("Failed to reorder subcategories:", failedUpdate.error.message);
+    return { success: false, error: "Не вдалося зберегти порядок підкатегорій." };
   }
 
   revalidatePath("/documents");

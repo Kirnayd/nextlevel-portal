@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 
 import { uploadDocument } from "@/features/documents/actions";
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
@@ -14,13 +14,21 @@ type UploadDocumentFormProps = {
   onSuccess?: () => void;
 };
 
+const selectClassName =
+  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+
 function buildUploadPayload(form: HTMLFormElement, file: File): FormData {
   const payload = new FormData();
   const categoryId = form.elements.namedItem("category_id");
+  const subcategoryId = form.elements.namedItem("subcategory_id");
   const titleField = form.elements.namedItem("title");
 
   if (categoryId instanceof HTMLSelectElement) {
     payload.append("category_id", categoryId.value);
+  }
+
+  if (subcategoryId instanceof HTMLSelectElement) {
+    payload.append("subcategory_id", subcategoryId.value);
   }
 
   if (titleField instanceof HTMLInputElement) {
@@ -36,9 +44,17 @@ function buildUploadPayload(form: HTMLFormElement, file: File): FormData {
 export function UploadDocumentForm({ categories, onSuccess }: UploadDocumentFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id ?? "");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.id === selectedCategoryId) ?? null,
+    [categories, selectedCategoryId],
+  );
+
+  const subcategories = selectedCategory?.subcategories ?? [];
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,6 +90,7 @@ export function UploadDocumentForm({ categories, onSuccess }: UploadDocumentForm
         fileInputRef.current.value = "";
       }
 
+      setSelectedCategoryId(categories[0]?.id ?? "");
       setSuccessMessage("Документ завантажено.");
 
       if (result.pushWarning) {
@@ -111,12 +128,32 @@ export function UploadDocumentForm({ categories, onSuccess }: UploadDocumentForm
           name="category_id"
           required
           disabled={isUploading}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          defaultValue={categories[0]?.id}
+          className={selectClassName}
+          value={selectedCategoryId}
+          onChange={(event) => setSelectedCategoryId(event.target.value)}
         >
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="document-subcategory">Підкатегорія — необов’язково</Label>
+        <select
+          id="document-subcategory"
+          name="subcategory_id"
+          disabled={isUploading || subcategories.length === 0}
+          className={selectClassName}
+          defaultValue="none"
+          key={selectedCategoryId}
+        >
+          <option value="none">Без підкатегорії</option>
+          {subcategories.map((subcategory) => (
+            <option key={subcategory.id} value={subcategory.id}>
+              {subcategory.name}
             </option>
           ))}
         </select>

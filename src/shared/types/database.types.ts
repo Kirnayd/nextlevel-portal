@@ -106,10 +106,35 @@ export type Database = {
         };
         Relationships: [];
       };
+      document_subcategories: {
+        Row: {
+          id: string;
+          category_id: string;
+          name: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          name: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          category_id?: string;
+          name?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       documents: {
         Row: {
           id: string;
           category_id: string;
+          subcategory_id: string | null;
           title: string;
           storage_path: string;
           original_filename: string;
@@ -122,6 +147,7 @@ export type Database = {
         Insert: {
           id?: string;
           category_id: string;
+          subcategory_id?: string | null;
           title: string;
           storage_path: string;
           original_filename: string;
@@ -134,6 +160,7 @@ export type Database = {
         Update: {
           id?: string;
           category_id?: string;
+          subcategory_id?: string | null;
           title?: string;
           storage_path?: string;
           original_filename?: string;

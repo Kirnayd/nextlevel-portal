@@ -31,7 +31,7 @@ export function DocumentsControls({
             type="search"
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
-            placeholder="За назвою або ім’ям файлу…"
+            placeholder="За назвою, файлу, категорією або підкатегорією…"
             className="pl-9"
             autoComplete="off"
           />

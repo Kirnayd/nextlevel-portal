@@ -35,15 +35,19 @@ type SortableCategoryListProps = {
 type SortableCategoryItemProps = {
   category: DocumentCategoryWithDocuments;
   totalDocumentCount: number;
+  subcategoryCount: number;
   allCategories: DocumentCategoryWithDocuments[];
   defaultOpen: boolean;
+  documentCountBySubcategoryId: Map<string, number>;
 };
 
 function SortableCategoryItem({
   category,
   totalDocumentCount,
+  subcategoryCount,
   allCategories,
   defaultOpen,
+  documentCountBySubcategoryId,
 }: SortableCategoryItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
@@ -75,10 +79,13 @@ function SortableCategoryItem({
       <CategorySection
         category={category}
         totalDocumentCount={totalDocumentCount}
+        subcategoryCount={subcategoryCount}
         allCategories={allCategories}
         isAdmin
         defaultOpen={defaultOpen}
         dragHandle={dragHandle}
+        enableSubcategoryDrag
+        documentCountBySubcategoryId={documentCountBySubcategoryId}
       />
     </div>
   );
@@ -97,6 +104,23 @@ export function SortableCategoryList({
     () => new Map(allCategories.map((category) => [category.id, category.documents.length])),
     [allCategories],
   );
+
+  const subcategoryCountByCategoryId = useMemo(
+    () => new Map(allCategories.map((category) => [category.id, category.subcategories.length])),
+    [allCategories],
+  );
+
+  const documentCountBySubcategoryId = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const category of allCategories) {
+      for (const subcategory of category.subcategories) {
+        counts.set(subcategory.id, subcategory.documents.length);
+      }
+    }
+
+    return counts;
+  }, [allCategories]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -191,8 +215,12 @@ export function SortableCategoryList({
                 totalDocumentCount={
                   documentCountByCategoryId.get(category.id) ?? category.documents.length
                 }
+                subcategoryCount={
+                  subcategoryCountByCategoryId.get(category.id) ?? category.subcategories.length
+                }
                 allCategories={allCategories}
                 defaultOpen={index === 0}
+                documentCountBySubcategoryId={documentCountBySubcategoryId}
               />
             ))}
           </div>

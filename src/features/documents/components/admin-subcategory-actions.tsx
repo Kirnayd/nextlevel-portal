@@ -3,23 +3,21 @@
 import { FormEvent, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 
-import { deleteCategory, renameCategory } from "@/features/documents/actions";
-import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
+import { deleteSubcategory, renameSubcategory } from "@/features/documents/actions";
+import type { DocumentSubcategoryWithDocuments } from "@/features/documents/actions";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 
-type AdminCategoryActionsProps = {
-  category: DocumentCategoryWithDocuments;
+type AdminSubcategoryActionsProps = {
+  subcategory: DocumentSubcategoryWithDocuments;
   totalDocumentCount: number;
-  subcategoryCount: number;
 };
 
-export function AdminCategoryActions({
-  category,
+export function AdminSubcategoryActions({
+  subcategory,
   totalDocumentCount,
-  subcategoryCount,
-}: AdminCategoryActionsProps) {
+}: AdminSubcategoryActionsProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showRenameForm, setShowRenameForm] = useState(false);
@@ -36,21 +34,21 @@ export function AdminCategoryActions({
 
     try {
       const formData = new FormData(event.currentTarget);
-      const result = await renameCategory(category.id, formData);
+      const result = await renameSubcategory(subcategory.id, formData);
 
       if (!result.success) {
         setErrorMessage(result.error);
         return;
       }
 
-      setSuccessMessage("Категорію перейменовано.");
+      setSuccessMessage("Підкатегорію перейменовано.");
       setShowRenameForm(false);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час перейменування.";
 
       setErrorMessage(message);
-      console.error("Rename category error:", error);
+      console.error("Rename subcategory error:", error);
     } finally {
       setIsRenaming(false);
     }
@@ -62,7 +60,7 @@ export function AdminCategoryActions({
     setIsDeleting(true);
 
     try {
-      const result = await deleteCategory(category.id);
+      const result = await deleteSubcategory(subcategory.id);
 
       if (!result.success) {
         setErrorMessage(result.error);
@@ -75,7 +73,7 @@ export function AdminCategoryActions({
         error instanceof Error ? error.message : "Невідома помилка під час видалення.";
 
       setErrorMessage(message);
-      console.error("Delete category error:", error);
+      console.error("Delete subcategory error:", error);
     } finally {
       setIsDeleting(false);
     }
@@ -120,12 +118,12 @@ export function AdminCategoryActions({
       {showRenameForm ? (
         <form className="space-y-3 rounded-md border bg-muted/20 p-3" onSubmit={handleRename}>
           <div className="space-y-2">
-            <Label htmlFor={`rename-category-${category.id}`}>Нова назва категорії</Label>
+            <Label htmlFor={`rename-subcategory-${subcategory.id}`}>Нова назва підкатегорії</Label>
             <Input
-              id={`rename-category-${category.id}`}
+              id={`rename-subcategory-${subcategory.id}`}
               name="name"
               required
-              defaultValue={category.name}
+              defaultValue={subcategory.name}
               disabled={isRenaming}
             />
           </div>
@@ -138,16 +136,11 @@ export function AdminCategoryActions({
       {showDeleteConfirm ? (
         <div className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-3">
           <p className="text-sm">
-            Видалити категорію «{category.name}»? Цю дію не можна скасувати.
+            Видалити підкатегорію «{subcategory.name}»? Цю дію не можна скасувати.
           </p>
           {totalDocumentCount > 0 ? (
             <p className="text-sm text-destructive">
-              У категорії є документи ({totalDocumentCount}). Спочатку видаліть або
-              перемістіть їх.
-            </p>
-          ) : subcategoryCount > 0 ? (
-            <p className="text-sm text-destructive">
-              У категорії є підкатегорії ({subcategoryCount}). Спочатку видаліть їх.
+              Неможливо видалити підкатегорію, поки в ній є документи.
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">

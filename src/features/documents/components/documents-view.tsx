@@ -47,14 +47,31 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
   }, [categories]);
 
   const visibleCategories = useMemo(
-    () => filterCategoriesForDisplay(orderedCategories, searchQuery, hideEmpty),
-    [orderedCategories, searchQuery, hideEmpty],
+    () => filterCategoriesForDisplay(orderedCategories, searchQuery, hideEmpty, isAdmin),
+    [orderedCategories, searchQuery, hideEmpty, isAdmin],
   );
 
   const documentCountByCategoryId = useMemo(
     () => new Map(orderedCategories.map((category) => [category.id, category.documents.length])),
     [orderedCategories],
   );
+
+  const subcategoryCountByCategoryId = useMemo(
+    () => new Map(orderedCategories.map((category) => [category.id, category.subcategories.length])),
+    [orderedCategories],
+  );
+
+  const documentCountBySubcategoryId = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const category of orderedCategories) {
+      for (const subcategory of category.subcategories) {
+        counts.set(subcategory.id, subcategory.documents.length);
+      }
+    }
+
+    return counts;
+  }, [orderedCategories]);
 
   const isDragEnabled = isAdmin && searchQuery.trim().length === 0;
   const hasSearchQuery = searchQuery.trim().length > 0;
@@ -111,6 +128,9 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
           allCategories={orderedCategories}
           isAdmin={isAdmin}
           documentCountByCategoryId={documentCountByCategoryId}
+          subcategoryCountByCategoryId={subcategoryCountByCategoryId}
+          documentCountBySubcategoryId={documentCountBySubcategoryId}
+          enableSubcategoryDrag={false}
         />
       )}
     </div>

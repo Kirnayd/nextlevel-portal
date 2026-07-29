@@ -38,6 +38,8 @@ export const DOCUMENTS_MIME_TYPE_LABELS: Record<DocumentsAllowedMimeType, string
 };
 
 export const CATEGORY_NAME_MAX_LENGTH = 120;
+export const SUBCATEGORY_NAME_MAX_LENGTH = 120;
 export const DOCUMENT_TITLE_MAX_LENGTH = 200;
+export const UNCATEGORIZED_SUBCATEGORY_LABEL = "Без підкатегорії";
 
 export const HIDE_EMPTY_CATEGORIES_STORAGE_KEY = "documents-hide-empty-categories";

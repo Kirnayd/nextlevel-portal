@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { ArrowRightLeft, Pencil, Trash2 } from "lucide-react";
 
 import { deleteDocument, moveDocument, renameDocument } from "@/features/documents/actions";
@@ -14,17 +14,26 @@ type AdminDocumentActionsProps = {
   categories: DocumentCategoryWithDocuments[];
 };
 
+const selectClassName =
+  "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+
 export function AdminDocumentActions({ document, categories }: AdminDocumentActionsProps) {
   const [showRenameForm, setShowRenameForm] = useState(false);
   const [showMoveForm, setShowMoveForm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(document.category_id);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const otherCategories = categories.filter((category) => category.id !== document.category_id);
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.id === selectedCategoryId) ?? null,
+    [categories, selectedCategoryId],
+  );
+
+  const subcategories = selectedCategory?.subcategories ?? [];
 
   function resetPanels() {
     setShowRenameForm(false);
@@ -73,7 +82,13 @@ export function AdminDocumentActions({ document, categories }: AdminDocumentActi
     try {
       const formData = new FormData(event.currentTarget);
       const targetCategoryId = String(formData.get("category_id") ?? "");
-      const result = await moveDocument(document.id, targetCategoryId);
+      const targetSubcategoryInput = String(formData.get("subcategory_id") ?? "").trim();
+      const targetSubcategoryId =
+        targetSubcategoryInput && targetSubcategoryInput !== "none"
+          ? targetSubcategoryInput
+          : null;
+
+      const result = await moveDocument(document.id, targetCategoryId, targetSubcategoryId);
 
       if (!result.success) {
         setErrorMessage(result.error);
@@ -118,6 +133,8 @@ export function AdminDocumentActions({ document, categories }: AdminDocumentActi
     }
   }
 
+  const defaultSubcategoryValue = document.subcategory_id ?? "none";
+
   return (
     <div className="space-y-3 border-t pt-3">
       <div className="flex flex-wrap gap-2">
@@ -139,9 +156,10 @@ export function AdminDocumentActions({ document, categories }: AdminDocumentActi
           type="button"
           variant="outline"
           size="sm"
-          disabled={isRenaming || isMoving || isDeleting || otherCategories.length === 0}
+          disabled={isRenaming || isMoving || isDeleting || categories.length === 0}
           onClick={() => {
             resetPanels();
+            setSelectedCategoryId(document.category_id);
             setShowMoveForm(true);
           }}
         >
@@ -185,22 +203,45 @@ export function AdminDocumentActions({ document, categories }: AdminDocumentActi
       {showMoveForm ? (
         <form className="space-y-3 rounded-md border bg-muted/20 p-3" onSubmit={handleMove}>
           <div className="space-y-2">
-            <Label htmlFor={`move-document-${document.id}`}>Цільова категорія</Label>
+            <Label htmlFor={`move-document-category-${document.id}`}>Категорія</Label>
             <select
-              id={`move-document-${document.id}`}
+              id={`move-document-category-${document.id}`}
               name="category_id"
               required
               disabled={isMoving}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              defaultValue={otherCategories[0]?.id}
+              className={selectClassName}
+              value={selectedCategoryId}
+              onChange={(event) => setSelectedCategoryId(event.target.value)}
             >
-              {otherCategories.map((category) => (
+              {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>
               ))}
             </select>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={`move-document-subcategory-${document.id}`}>
+              Підкатегорія — необов’язково
+            </Label>
+            <select
+              id={`move-document-subcategory-${document.id}`}
+              name="subcategory_id"
+              disabled={isMoving}
+              className={selectClassName}
+              defaultValue={defaultSubcategoryValue}
+              key={selectedCategoryId}
+            >
+              <option value="none">Без підкатегорії</option>
+              {subcategories.map((subcategory) => (
+                <option key={subcategory.id} value={subcategory.id}>
+                  {subcategory.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <Button type="submit" size="sm" disabled={isMoving}>
             {isMoving ? "Переміщення…" : "Перемістити"}
           </Button>

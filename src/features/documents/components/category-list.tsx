@@ -8,6 +8,9 @@ type CategoryListProps = {
   allCategories: DocumentCategoryWithDocuments[];
   isAdmin: boolean;
   documentCountByCategoryId: Map<string, number>;
+  subcategoryCountByCategoryId: Map<string, number>;
+  documentCountBySubcategoryId: Map<string, number>;
+  enableSubcategoryDrag?: boolean;
 };
 
 export function CategoryList({
@@ -15,6 +18,9 @@ export function CategoryList({
   allCategories,
   isAdmin,
   documentCountByCategoryId,
+  subcategoryCountByCategoryId,
+  documentCountBySubcategoryId,
+  enableSubcategoryDrag = false,
 }: CategoryListProps) {
   return (
     <div className="space-y-4">
@@ -25,9 +31,12 @@ export function CategoryList({
           totalDocumentCount={
             documentCountByCategoryId.get(category.id) ?? category.documents.length
           }
+          subcategoryCount={subcategoryCountByCategoryId.get(category.id) ?? category.subcategories.length}
           allCategories={allCategories}
           isAdmin={isAdmin}
           defaultOpen={index === 0}
+          enableSubcategoryDrag={enableSubcategoryDrag}
+          documentCountBySubcategoryId={documentCountBySubcategoryId}
         />
       ))}
     </div>
