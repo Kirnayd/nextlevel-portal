@@ -31,7 +31,7 @@ export default async function DocumentsPage() {
           </div>
 
           <Button asChild variant="outline" className="shrink-0">
-            <a href="/dashboard">На dashboard</a>
+            <a href="/dashboard">На головну</a>
           </Button>
         </div>
 

@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     <main className="flex min-h-screen items-center justify-center">
       <div className="rounded-xl border p-8">
         <h1 className="text-3xl font-bold">
-          Dashboard
+          Головна
         </h1>
 
         <p className="mt-4">

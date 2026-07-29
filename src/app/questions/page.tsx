@@ -46,7 +46,7 @@ export default async function QuestionsPage({ searchParams }: QuestionsPageProps
           </div>
 
           <Button asChild variant="outline" className="shrink-0">
-            <a href="/dashboard">На dashboard</a>
+            <a href="/dashboard">На головну</a>
           </Button>
         </div>
 

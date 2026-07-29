@@ -37,7 +37,7 @@ export default async function PricePage() {
           </div>
 
           <Button asChild variant="outline">
-            <a href="/dashboard">На dashboard</a>
+            <a href="/dashboard">На головну</a>
           </Button>
         </div>
 
