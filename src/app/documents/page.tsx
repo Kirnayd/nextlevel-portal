@@ -2,20 +2,18 @@ import { redirect } from "next/navigation";
 
 import { getDocumentCategoriesWithDocuments } from "@/features/documents/actions";
 import { DocumentsView } from "@/features/documents/components/documents-view";
-import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
+import { getSessionContext } from "@/shared/lib/auth";
 import { Button } from "@/shared/components/ui/button";
 
 export default async function DocumentsPage() {
-  const user = await getAuthenticatedUser();
+  const session = await getSessionContext();
 
-  if (!user) {
+  if (!session) {
     redirect("/login");
   }
 
-  const [categories, userIsAdmin] = await Promise.all([
-    getDocumentCategoriesWithDocuments(),
-    isAdmin(user.id),
-  ]);
+  const categories = await getDocumentCategoriesWithDocuments();
+  const userIsAdmin = session.isAdmin;
 
   return (
     <main className="min-h-screen bg-background px-4 py-10">

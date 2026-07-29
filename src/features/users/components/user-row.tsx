@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   blockUser,
@@ -24,7 +23,6 @@ type UserRowProps = {
 };
 
 export function UserRow({ user, currentUserId }: UserRowProps) {
-  const router = useRouter();
   const isCurrentUser = user.id === currentUserId;
   const [isEditing, setIsEditing] = useState(false);
   const [isSettingPassword, setIsSettingPassword] = useState(false);
@@ -48,7 +46,6 @@ export function UserRow({ user, currentUserId }: UserRowProps) {
 
       setSuccessMessage("Дані користувача оновлено.");
       setIsEditing(false);
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час оновлення користувача.";
@@ -78,7 +75,6 @@ export function UserRow({ user, currentUserId }: UserRowProps) {
       form.reset();
       setSuccessMessage("Пароль успішно змінено.");
       setIsSettingPassword(false);
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час зміни пароля.";
@@ -116,7 +112,6 @@ export function UserRow({ user, currentUserId }: UserRowProps) {
       }
 
       setSuccessMessage(isBlocking ? "Користувача заблоковано." : "Користувача розблоковано.");
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час зміни статусу.";
@@ -150,7 +145,6 @@ export function UserRow({ user, currentUserId }: UserRowProps) {
       }
 
       setSuccessMessage("Користувача видалено.");
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час видалення користувача.";

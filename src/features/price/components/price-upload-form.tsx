@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { uploadPriceFile } from "@/features/price/actions";
 import { PRICE_ALLOWED_EXTENSIONS } from "@/features/price/constants";
@@ -10,7 +9,6 @@ import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 
 export function PriceUploadForm() {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -33,8 +31,6 @@ export function PriceUploadForm() {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час завантаження.";

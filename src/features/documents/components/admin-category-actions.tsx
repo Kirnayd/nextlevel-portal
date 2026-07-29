@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 
 import { deleteCategory, renameCategory } from "@/features/documents/actions";
@@ -16,7 +15,6 @@ type AdminCategoryActionsProps = {
 };
 
 export function AdminCategoryActions({ category, totalDocumentCount }: AdminCategoryActionsProps) {
-  const router = useRouter();
   const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showRenameForm, setShowRenameForm] = useState(false);
@@ -42,7 +40,6 @@ export function AdminCategoryActions({ category, totalDocumentCount }: AdminCate
 
       setSuccessMessage("Категорію перейменовано.");
       setShowRenameForm(false);
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час перейменування.";
@@ -68,7 +65,6 @@ export function AdminCategoryActions({ category, totalDocumentCount }: AdminCate
       }
 
       setShowDeleteConfirm(false);
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час видалення.";

@@ -2,20 +2,18 @@ import { redirect } from "next/navigation";
 
 import { getAnnouncements } from "@/features/announcements/actions";
 import { AnnouncementsView } from "@/features/announcements/components/announcements-view";
-import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
+import { getSessionContext } from "@/shared/lib/auth";
 import { Button } from "@/shared/components/ui/button";
 
 export default async function AnnouncementsPage() {
-  const user = await getAuthenticatedUser();
+  const session = await getSessionContext();
 
-  if (!user) {
+  if (!session) {
     redirect("/login");
   }
 
-  const [announcements, userIsAdmin] = await Promise.all([
-    getAnnouncements(),
-    isAdmin(user.id),
-  ]);
+  const announcements = await getAnnouncements();
+  const userIsAdmin = session.isAdmin;
 
   return (
     <main className="min-h-screen bg-background px-4 py-10">

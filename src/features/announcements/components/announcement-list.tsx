@@ -3,9 +3,7 @@
 import dynamic from "next/dynamic";
 
 import type { AnnouncementWithImages } from "@/features/announcements/actions";
-import { AdminAnnouncementActions } from "@/features/announcements/components/admin-announcement-actions";
 import { AnnouncementCoverThumbnail } from "@/features/announcements/components/announcement-cover-thumbnail";
-import { AnnouncementGallery } from "@/features/announcements/components/announcement-gallery";
 import { HiddenBadge } from "@/features/announcements/components/hidden-badge";
 import { PinnedBadge } from "@/features/announcements/components/pinned-badge";
 import {
@@ -20,6 +18,22 @@ const AdminAnnouncementImages = dynamic(
   () =>
     import("@/features/announcements/components/admin-announcement-images").then(
       (module) => module.AdminAnnouncementImages,
+    ),
+  { ssr: false, loading: () => null },
+);
+
+const AdminAnnouncementActions = dynamic(
+  () =>
+    import("@/features/announcements/components/admin-announcement-actions").then(
+      (module) => module.AdminAnnouncementActions,
+    ),
+  { ssr: false, loading: () => null },
+);
+
+const AnnouncementGallery = dynamic(
+  () =>
+    import("@/features/announcements/components/announcement-gallery").then(
+      (module) => module.AnnouncementGallery,
     ),
   { ssr: false, loading: () => null },
 );

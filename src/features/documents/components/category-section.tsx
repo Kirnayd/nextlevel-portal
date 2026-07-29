@@ -1,10 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { FolderOpen } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
-import { AdminCategoryActions } from "@/features/documents/components/admin-category-actions";
 import { DocumentRow } from "@/features/documents/components/document-row";
 import {
   Card,
@@ -12,6 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
+
+const AdminCategoryActions = dynamic(
+  () =>
+    import("@/features/documents/components/admin-category-actions").then(
+      (module) => module.AdminCategoryActions,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 type CategorySectionProps = {
   category: DocumentCategoryWithDocuments;

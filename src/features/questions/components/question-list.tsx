@@ -1,9 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 
 import type { QuestionWithAnswer } from "@/features/questions/actions";
-import { AdminQuestionActions } from "@/features/questions/components/admin-question-actions";
 import { QuestionStatusBadge } from "@/features/questions/components/question-status-badge";
 import {
   Card,
@@ -13,6 +13,14 @@ import {
   CardTitle,
 } from "@/shared/components/ui/card";
 import { cn } from "@/shared/lib/utils";
+
+const AdminQuestionActions = dynamic(
+  () =>
+    import("@/features/questions/components/admin-question-actions").then(
+      (module) => module.AdminQuestionActions,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 type QuestionListProps = {
   questions: QuestionWithAnswer[];

@@ -149,17 +149,15 @@ export async function getUsers(searchQuery = ""): Promise<ManagedUser[]> {
 
   const supabase = await createClient();
 
-  const { data: profiles, error: profilesError } = await supabase
-    .from("profiles")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const [{ data: profiles, error: profilesError }, authUsersById] = await Promise.all([
+    supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+    loadAuthUsersById(),
+  ]);
 
   if (profilesError) {
     logSupabaseError("Failed to load profiles", profilesError);
     return [];
   }
-
-  const authUsersById = await loadAuthUsersById();
 
   const users = ((profiles ?? []) as Profile[]).map((profile) => {
     const authUser = authUsersById.get(profile.id);

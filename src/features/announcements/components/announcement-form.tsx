@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { createAnnouncement, updateAnnouncement } from "@/features/announcements/actions";
 import type { AnnouncementWithImages } from "@/features/announcements/actions";
@@ -27,7 +26,6 @@ export function AnnouncementForm({
   onSuccess,
   onCancel,
 }: AnnouncementFormProps) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -63,7 +61,6 @@ export function AnnouncementForm({
       }
 
       setSuccessMessage(mode === "create" ? "Оголошення створено." : "Оголошення збережено.");
-      router.refresh();
       onSuccess?.();
     } catch (error) {
       const message =

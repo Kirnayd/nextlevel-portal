@@ -1,11 +1,11 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
-import { AdminToolbar } from "@/features/documents/components/admin-toolbar";
+import { CategoryList } from "@/features/documents/components/category-list";
 import { DocumentsControls } from "@/features/documents/components/documents-controls";
-import { SortableCategoryList } from "@/features/documents/components/sortable-category-list";
 import { filterCategoriesForDisplay } from "@/features/documents/lib/filter-categories";
 import { useHideEmptyCategoriesPreference } from "@/features/documents/lib/use-hide-empty-categories";
 import {
@@ -14,6 +14,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
+
+const AdminToolbar = dynamic(
+  () =>
+    import("@/features/documents/components/admin-toolbar").then(
+      (module) => module.AdminToolbar,
+    ),
+  { ssr: false, loading: () => null },
+);
+
+const SortableCategoryList = dynamic(
+  () =>
+    import("@/features/documents/components/sortable-category-list").then(
+      (module) => module.SortableCategoryList,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 type DocumentsViewProps = {
   categories: DocumentCategoryWithDocuments[];
@@ -33,6 +49,11 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
   const visibleCategories = useMemo(
     () => filterCategoriesForDisplay(orderedCategories, searchQuery, hideEmpty),
     [orderedCategories, searchQuery, hideEmpty],
+  );
+
+  const documentCountByCategoryId = useMemo(
+    () => new Map(orderedCategories.map((category) => [category.id, category.documents.length])),
+    [orderedCategories],
   );
 
   const isDragEnabled = isAdmin && searchQuery.trim().length === 0;
@@ -77,14 +98,19 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
             </CardDescription>
           </CardHeader>
         </Card>
-      ) : (
+      ) : isDragEnabled ? (
         <SortableCategoryList
           visibleCategories={visibleCategories}
           orderedCategories={orderedCategories}
           allCategories={orderedCategories}
-          isAdmin={isAdmin}
-          isDragEnabled={isDragEnabled}
           onOrderChange={setOrderedCategories}
+        />
+      ) : (
+        <CategoryList
+          visibleCategories={visibleCategories}
+          allCategories={orderedCategories}
+          isAdmin={isAdmin}
+          documentCountByCategoryId={documentCountByCategoryId}
         />
       )}
     </div>

@@ -1,25 +1,18 @@
-const CACHE_VERSION = "nextlevel-static-v1";
+const CACHE_VERSION = "nextlevel-static-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-assets`;
 
 const NEVER_CACHE_PATH_PREFIXES = ["/api/"];
-const NEVER_CACHE_HOST_SUFFIXES = ["supabase.co", "supabase.in"];
 
 function shouldNeverCache(url) {
-  if (url.origin !== self.location.origin) {
-    if (NEVER_CACHE_HOST_SUFFIXES.some((suffix) => url.hostname.endsWith(suffix))) {
-      return true;
-    }
-
-    return true;
-  }
-
-  return NEVER_CACHE_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
+  return url.origin !== self.location.origin;
 }
 
 function isStaticAsset(url) {
   return (
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
+    url.pathname === "/pdf.worker.min.mjs" ||
+    url.pathname === "/manifest.webmanifest" ||
     url.pathname.endsWith(".woff2")
   );
 }
@@ -72,6 +65,14 @@ self.addEventListener("fetch", (event) => {
       const cachedResponse = await cache.match(request);
 
       if (cachedResponse) {
+        void fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse.ok) {
+              void cache.put(request, networkResponse.clone());
+            }
+          })
+          .catch(() => undefined);
+
         return cachedResponse;
       }
 

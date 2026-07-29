@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowRightLeft, Pencil, Trash2 } from "lucide-react";
 
 import { deleteDocument, moveDocument, renameDocument } from "@/features/documents/actions";
@@ -16,7 +15,6 @@ type AdminDocumentActionsProps = {
 };
 
 export function AdminDocumentActions({ document, categories }: AdminDocumentActionsProps) {
-  const router = useRouter();
   const [showRenameForm, setShowRenameForm] = useState(false);
   const [showMoveForm, setShowMoveForm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -54,7 +52,6 @@ export function AdminDocumentActions({ document, categories }: AdminDocumentActi
 
       setSuccessMessage("Документ перейменовано.");
       setShowRenameForm(false);
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час перейменування.";
@@ -85,7 +82,6 @@ export function AdminDocumentActions({ document, categories }: AdminDocumentActi
 
       setSuccessMessage("Документ переміщено.");
       setShowMoveForm(false);
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час переміщення.";
@@ -111,7 +107,6 @@ export function AdminDocumentActions({ document, categories }: AdminDocumentActi
       }
 
       setShowDeleteConfirm(false);
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час видалення.";

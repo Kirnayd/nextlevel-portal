@@ -88,6 +88,7 @@ async function loadAuthors(userIds: string[]): Promise<Map<string, QuestionAutho
 
 export async function getQuestions(
   filterParam?: string,
+  options?: { userIsAdmin?: boolean },
 ): Promise<QuestionWithAnswer[]> {
   const user = await getAuthenticatedUser();
 
@@ -96,7 +97,7 @@ export async function getQuestions(
   }
 
   const supabase = await createClient();
-  const userIsAdmin = await isAdmin(user.id);
+  const userIsAdmin = options?.userIsAdmin ?? (await isAdmin(user.id));
   const filter = normalizeFilter(filterParam);
 
   let query = supabase

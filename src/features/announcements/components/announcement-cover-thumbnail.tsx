@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import type { AnnouncementImage } from "@/features/announcements/actions";
 import { getAnnouncementImageUrl } from "@/features/announcements/constants";
 import { AnnouncementImagePlaceholder } from "@/features/announcements/components/announcement-image-placeholder";
@@ -26,12 +28,14 @@ export function AnnouncementCoverThumbnail({ images, className }: AnnouncementCo
         className,
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={getAnnouncementImageUrl(coverImage.id)}
         alt=""
-        className="size-full object-cover"
+        fill
+        sizes="220px"
+        className="object-cover"
         loading="lazy"
+        unoptimized
       />
     </div>
   );

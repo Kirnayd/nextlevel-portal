@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 
 import {
@@ -18,7 +17,6 @@ type AdminAnnouncementActionsProps = {
 };
 
 export function AdminAnnouncementActions({ announcement }: AdminAnnouncementActionsProps) {
-  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -45,7 +43,6 @@ export function AdminAnnouncementActions({ announcement }: AdminAnnouncementActi
         setSuccessMessage(successText);
       }
 
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час виконання дії.";
@@ -71,7 +68,6 @@ export function AdminAnnouncementActions({ announcement }: AdminAnnouncementActi
       }
 
       setShowDeleteConfirm(false);
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час видалення.";

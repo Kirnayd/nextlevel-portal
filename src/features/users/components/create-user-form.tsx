@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { createUser } from "@/features/users/actions";
 import { USER_ROLE_LABELS } from "@/features/users/constants";
@@ -15,7 +14,6 @@ type CreateUserFormProps = {
 };
 
 export function CreateUserForm({ onSuccess, onCancel }: CreateUserFormProps) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -45,7 +43,6 @@ export function CreateUserForm({ onSuccess, onCancel }: CreateUserFormProps) {
 
       form.reset();
       setSuccessMessage("Користувача створено.");
-      router.refresh();
       onSuccess?.();
     } catch (error) {
       const message =

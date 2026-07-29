@@ -9,7 +9,7 @@ import { cn } from "@/shared/lib/utils";
 
 const FileViewer = dynamic(
   () => import("@/shared/components/file-viewer/file-viewer").then((module) => module.FileViewer),
-  { ssr: false },
+  { ssr: false, loading: () => null },
 );
 
 type FileOpenTriggerProps = {
@@ -52,15 +52,17 @@ export function FileOpenTrigger({
         {label}
       </Button>
 
-      <FileViewer
-        open={isOpen}
-        onClose={handleClose}
-        downloadUrl={downloadUrl}
-        filename={filename}
-        mimeType={mimeType}
-        fileTypeLabel={fileTypeLabel}
-        sizeBytes={sizeBytes}
-      />
+      {isOpen ? (
+        <FileViewer
+          open={isOpen}
+          onClose={handleClose}
+          downloadUrl={downloadUrl}
+          filename={filename}
+          mimeType={mimeType}
+          fileTypeLabel={fileTypeLabel}
+          sizeBytes={sizeBytes}
+        />
+      ) : null}
     </>
   );
 }

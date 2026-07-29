@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getUsers } from "@/features/users/actions";
 import { UsersView } from "@/features/users/components/users-view";
-import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
+import { getSessionContext } from "@/shared/lib/auth";
 import { Button } from "@/shared/components/ui/button";
 
 type UsersPageProps = {
@@ -10,13 +10,13 @@ type UsersPageProps = {
 };
 
 export default async function UsersPage({ searchParams }: UsersPageProps) {
-  const user = await getAuthenticatedUser();
+  const session = await getSessionContext();
 
-  if (!user) {
+  if (!session) {
     redirect("/login");
   }
 
-  if (!(await isAdmin(user.id))) {
+  if (!session.isAdmin) {
     redirect("/dashboard");
   }
 
@@ -39,7 +39,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
           </Button>
         </div>
 
-        <UsersView users={users} currentUserId={user.id} searchQuery={q} />
+        <UsersView users={users} currentUserId={session.user.id} searchQuery={q} />
       </div>
     </main>
   );

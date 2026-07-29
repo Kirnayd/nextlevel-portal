@@ -1,7 +1,9 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import { Download, ExternalLink, FileText } from "lucide-react";
 
 import type { Document, DocumentCategoryWithDocuments } from "@/features/documents/actions";
-import { AdminDocumentActions } from "@/features/documents/components/admin-document-actions";
 import {
   formatFileSize,
   formatUploadedAt,
@@ -9,6 +11,14 @@ import {
 } from "@/features/documents/lib/format";
 import { FileOpenTrigger } from "@/shared/components/file-viewer/file-open-trigger";
 import { isPdfMimeType } from "@/shared/lib/file-types";
+
+const AdminDocumentActions = dynamic(
+  () =>
+    import("@/features/documents/components/admin-document-actions").then(
+      (module) => module.AdminDocumentActions,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 type DocumentRowProps = {
   document: Document;

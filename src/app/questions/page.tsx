@@ -5,7 +5,7 @@ import { EmployeeQuestionPanel } from "@/features/questions/components/employee-
 import { QuestionList } from "@/features/questions/components/question-list";
 import { QuestionStatusFilter } from "@/features/questions/components/question-status-filter";
 import type { QuestionFilter } from "@/features/questions/constants";
-import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
+import { getSessionContext } from "@/shared/lib/auth";
 import { Button } from "@/shared/components/ui/button";
 
 type QuestionsPageProps = {
@@ -21,16 +21,18 @@ function normalizeFilter(status: string | undefined): QuestionFilter {
 }
 
 export default async function QuestionsPage({ searchParams }: QuestionsPageProps) {
-  const user = await getAuthenticatedUser();
+  const session = await getSessionContext();
 
-  if (!user) {
+  if (!session) {
     redirect("/login");
   }
 
   const params = await searchParams;
-  const userIsAdmin = await isAdmin(user.id);
+  const userIsAdmin = session.isAdmin;
   const activeFilter = userIsAdmin ? normalizeFilter(params.status) : "all";
-  const questions = await getQuestions(userIsAdmin ? activeFilter : undefined);
+  const questions = await getQuestions(userIsAdmin ? activeFilter : undefined, {
+    userIsAdmin,
+  });
 
   return (
     <main className="min-h-screen bg-background px-4 py-10">

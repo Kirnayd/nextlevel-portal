@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { createCategory } from "@/features/documents/actions";
 import { Button } from "@/shared/components/ui/button";
@@ -13,7 +12,6 @@ type CreateCategoryFormProps = {
 };
 
 export function CreateCategoryForm({ onSuccess }: CreateCategoryFormProps) {
-  const router = useRouter();
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,7 +36,6 @@ export function CreateCategoryForm({ onSuccess }: CreateCategoryFormProps) {
 
       form.reset();
       setSuccessMessage("Категорію створено.");
-      router.refresh();
       onSuccess?.();
     } catch (error) {
       const message =

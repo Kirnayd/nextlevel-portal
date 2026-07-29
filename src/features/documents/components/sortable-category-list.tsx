@@ -18,7 +18,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { reorderCategories } from "@/features/documents/actions";
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
@@ -30,8 +29,6 @@ type SortableCategoryListProps = {
   visibleCategories: DocumentCategoryWithDocuments[];
   orderedCategories: DocumentCategoryWithDocuments[];
   allCategories: DocumentCategoryWithDocuments[];
-  isAdmin: boolean;
-  isDragEnabled: boolean;
   onOrderChange: (categories: DocumentCategoryWithDocuments[]) => void;
 };
 
@@ -39,8 +36,6 @@ type SortableCategoryItemProps = {
   category: DocumentCategoryWithDocuments;
   totalDocumentCount: number;
   allCategories: DocumentCategoryWithDocuments[];
-  isAdmin: boolean;
-  isDragEnabled: boolean;
   defaultOpen: boolean;
 };
 
@@ -48,13 +43,10 @@ function SortableCategoryItem({
   category,
   totalDocumentCount,
   allCategories,
-  isAdmin,
-  isDragEnabled,
   defaultOpen,
 }: SortableCategoryItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
-    disabled: !isDragEnabled,
   });
 
   const style = {
@@ -62,7 +54,7 @@ function SortableCategoryItem({
     transition,
   };
 
-  const dragHandle = isDragEnabled ? (
+  const dragHandle = (
     <button
       type="button"
       className={cn(
@@ -76,7 +68,7 @@ function SortableCategoryItem({
     >
       <GripVertical className="size-4" />
     </button>
-  ) : null;
+  );
 
   return (
     <div ref={setNodeRef} style={style} className={cn(isDragging && "z-10 opacity-80")}>
@@ -84,7 +76,7 @@ function SortableCategoryItem({
         category={category}
         totalDocumentCount={totalDocumentCount}
         allCategories={allCategories}
-        isAdmin={isAdmin}
+        isAdmin
         defaultOpen={defaultOpen}
         dragHandle={dragHandle}
       />
@@ -96,11 +88,8 @@ export function SortableCategoryList({
   visibleCategories,
   orderedCategories,
   allCategories,
-  isAdmin,
-  isDragEnabled,
   onOrderChange,
 }: SortableCategoryListProps) {
-  const router = useRouter();
   const [isReordering, setIsReordering] = useState(false);
   const [reorderError, setReorderError] = useState("");
 
@@ -156,10 +145,7 @@ export function SortableCategoryList({
       if (!result.success) {
         onOrderChange(previousOrder);
         setReorderError(result.error);
-        return;
       }
-
-      router.refresh();
     } catch (error) {
       onOrderChange(previousOrder);
       const message =
@@ -170,23 +156,6 @@ export function SortableCategoryList({
     } finally {
       setIsReordering(false);
     }
-  }
-
-  if (!isAdmin || !isDragEnabled) {
-    return (
-      <div className="space-y-4">
-        {visibleCategories.map((category, index) => (
-          <CategorySection
-            key={category.id}
-            category={category}
-            totalDocumentCount={documentCountByCategoryId.get(category.id) ?? category.documents.length}
-            allCategories={allCategories}
-            isAdmin={isAdmin}
-            defaultOpen={index === 0}
-          />
-        ))}
-      </div>
-    );
   }
 
   return (
@@ -223,8 +192,6 @@ export function SortableCategoryList({
                   documentCountByCategoryId.get(category.id) ?? category.documents.length
                 }
                 allCategories={allCategories}
-                isAdmin={isAdmin}
-                isDragEnabled={isDragEnabled}
                 defaultOpen={index === 0}
               />
             ))}

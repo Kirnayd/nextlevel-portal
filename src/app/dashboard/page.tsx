@@ -1,20 +1,16 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/infrastructure/supabase/server";
-import { isAdmin } from "@/shared/lib/auth";
+import { getSessionContext } from "@/shared/lib/auth";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
+  const session = await getSessionContext();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!session) {
     redirect("/login");
   }
 
-  const userIsAdmin = await isAdmin(user.id);
+  const { user, isAdmin: userIsAdmin } = session;
 
   return (
     <main className="flex min-h-screen items-center justify-center">
@@ -32,37 +28,42 @@ export default async function DashboardPage() {
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <a
+          <Link
             href="/announcements"
+            prefetch
             className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             Оголошення
-          </a>
-          <a
+          </Link>
+          <Link
             href="/price"
+            prefetch
             className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             Прайс
-          </a>
-          <a
+          </Link>
+          <Link
             href="/documents"
+            prefetch
             className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             Документи
-          </a>
-          <a
+          </Link>
+          <Link
             href="/questions"
+            prefetch
             className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             Запитання
-          </a>
+          </Link>
           {userIsAdmin ? (
-            <a
+            <Link
               href="/users"
+              prefetch
               className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
               Користувачі
-            </a>
+            </Link>
           ) : null}
         </div>
 

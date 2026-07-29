@@ -1,10 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import type { AnnouncementWithImages } from "@/features/announcements/actions";
-import { AnnouncementForm } from "@/features/announcements/components/announcement-form";
 import { AnnouncementList } from "@/features/announcements/components/announcement-list";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -14,6 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
+
+const AnnouncementForm = dynamic(
+  () =>
+    import("@/features/announcements/components/announcement-form").then(
+      (module) => module.AnnouncementForm,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 type AnnouncementsViewProps = {
   announcements: AnnouncementWithImages[];

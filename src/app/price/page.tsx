@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentPriceFile } from "@/features/price/actions";
 import { PriceUploadForm } from "@/features/price/components/price-upload-form";
 import { PriceView } from "@/features/price/components/price-view";
-import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
+import { getSessionContext } from "@/shared/lib/auth";
 import { Button } from "@/shared/components/ui/button";
 import {
   Card,
@@ -14,16 +14,14 @@ import {
 } from "@/shared/components/ui/card";
 
 export default async function PricePage() {
-  const user = await getAuthenticatedUser();
+  const session = await getSessionContext();
 
-  if (!user) {
+  if (!session) {
     redirect("/login");
   }
 
-  const [priceFile, userIsAdmin] = await Promise.all([
-    getCurrentPriceFile(),
-    isAdmin(user.id),
-  ]);
+  const priceFile = await getCurrentPriceFile();
+  const userIsAdmin = session.isAdmin;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-10">

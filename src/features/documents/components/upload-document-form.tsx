@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { uploadDocument } from "@/features/documents/actions";
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
@@ -35,7 +34,6 @@ function buildUploadPayload(form: HTMLFormElement, file: File): FormData {
 }
 
 export function UploadDocumentForm({ categories, onSuccess }: UploadDocumentFormProps) {
-  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -77,7 +75,6 @@ export function UploadDocumentForm({ categories, onSuccess }: UploadDocumentForm
       }
 
       setSuccessMessage("Документ завантажено.");
-      router.refresh();
       onSuccess?.();
     } catch (error) {
       const message =

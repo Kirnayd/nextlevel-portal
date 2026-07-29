@@ -19,7 +19,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Trash2, Upload } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import {
   deleteAnnouncementImage,
@@ -115,7 +114,6 @@ function SortableImageItem({ image, isCover, isBusy, onDelete }: SortableImageIt
 }
 
 export function AdminAnnouncementImages({ announcementId, images }: AdminAnnouncementImagesProps) {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [orderedImages, setOrderedImages] = useState(images);
   const [errorMessage, setErrorMessage] = useState("");
@@ -180,7 +178,6 @@ export function AdminAnnouncementImages({ announcementId, images }: AdminAnnounc
 
       if (!hadError) {
         setSuccessMessage("Зображення завантажено.");
-        router.refresh();
       }
     } catch (error) {
       const message =
@@ -208,7 +205,6 @@ export function AdminAnnouncementImages({ announcementId, images }: AdminAnnounc
       }
 
       setSuccessMessage("Зображення видалено.");
-      router.refresh();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час видалення.";
@@ -255,7 +251,6 @@ export function AdminAnnouncementImages({ announcementId, images }: AdminAnnounc
       }
 
       setSuccessMessage("Порядок зображень збережено.");
-      router.refresh();
     } catch (error) {
       setOrderedImages(previousOrder);
       const message =

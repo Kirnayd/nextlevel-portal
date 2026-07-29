@@ -37,37 +37,6 @@ function parsePinnedFromForm(formData: FormData): boolean {
   return formData.get("is_pinned") === "on";
 }
 
-async function loadAnnouncementImages(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  announcementIds: string[],
-): Promise<Map<string, AnnouncementImage[]>> {
-  const imagesByAnnouncementId = new Map<string, AnnouncementImage[]>();
-
-  if (announcementIds.length === 0) {
-    return imagesByAnnouncementId;
-  }
-
-  const { data, error } = await supabase
-    .from("announcement_images")
-    .select("*")
-    .in("announcement_id", announcementIds)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    logSupabaseError("Failed to load announcement images", error);
-    return imagesByAnnouncementId;
-  }
-
-  for (const image of (data ?? []) as AnnouncementImage[]) {
-    const existing = imagesByAnnouncementId.get(image.announcement_id) ?? [];
-    existing.push(image);
-    imagesByAnnouncementId.set(image.announcement_id, existing);
-  }
-
-  return imagesByAnnouncementId;
-}
-
 async function requireAdmin(): Promise<
   { user: NonNullable<Awaited<ReturnType<typeof getAuthenticatedUser>>> } | ActionResult
 > {
@@ -118,7 +87,7 @@ export async function getAnnouncements(): Promise<AnnouncementWithImages[]> {
 
   const { data, error } = await supabase
     .from("announcements")
-    .select("*")
+    .select("*, announcement_images(*)")
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -127,21 +96,16 @@ export async function getAnnouncements(): Promise<AnnouncementWithImages[]> {
     return [];
   }
 
-  const announcements = (data ?? []) as Announcement[];
+  return ((data ?? []) as Array<Announcement & { announcement_images: AnnouncementImage[] | null }>).map(
+    (row) => {
+      const { announcement_images, ...announcement } = row;
 
-  if (announcements.length === 0) {
-    return [];
-  }
-
-  const imagesByAnnouncementId = await loadAnnouncementImages(
-    supabase,
-    announcements.map((announcement) => announcement.id),
+      return {
+        ...announcement,
+        images: sortAnnouncementImages(announcement_images ?? []),
+      };
+    },
   );
-
-  return announcements.map((announcement) => ({
-    ...announcement,
-    images: sortAnnouncementImages(imagesByAnnouncementId.get(announcement.id) ?? []),
-  }));
 }
 
 export async function getAnnouncementImageById(imageId: string): Promise<AnnouncementImage | null> {

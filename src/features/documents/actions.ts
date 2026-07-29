@@ -91,21 +91,22 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
 
   const supabase = await createClient();
 
-  const { data: categories, error: categoriesError } = await supabase
-    .from("document_categories")
-    .select("*")
-    .order("sort_order", { ascending: true })
-    .order("name", { ascending: true });
+  const [
+    { data: categories, error: categoriesError },
+    { data: documents, error: documentsError },
+  ] = await Promise.all([
+    supabase
+      .from("document_categories")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase.from("documents").select("*").order("created_at", { ascending: false }),
+  ]);
 
   if (categoriesError) {
     console.error("Failed to load document categories:", categoriesError.message);
     return [];
   }
-
-  const { data: documents, error: documentsError } = await supabase
-    .from("documents")
-    .select("*")
-    .order("created_at", { ascending: false });
 
   if (documentsError) {
     console.error("Failed to load documents:", documentsError.message);

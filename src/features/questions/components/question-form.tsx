@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { createQuestion } from "@/features/questions/actions";
 import { Button } from "@/shared/components/ui/button";
@@ -18,7 +17,6 @@ type QuestionFormProps = {
 };
 
 export function QuestionForm({ onCancel }: QuestionFormProps) {
-  const router = useRouter();
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,7 +40,6 @@ export function QuestionForm({ onCancel }: QuestionFormProps) {
 
       form.reset();
       setSuccessMessage("Запитання успішно надіслано");
-      router.refresh();
 
       if (onCancel) {
         onCancel();

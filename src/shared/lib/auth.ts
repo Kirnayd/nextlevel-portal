@@ -1,11 +1,18 @@
 import type { User } from "@supabase/supabase-js";
+import { cache } from "react";
 
 import { createClient } from "@/infrastructure/supabase/server";
 import type { Enums } from "@/shared/types/database.types";
 
 export type UserRole = Enums<"user_role">;
 
-export async function getAuthenticatedUser(): Promise<User | null> {
+export type SessionContext = {
+  user: User;
+  role: UserRole;
+  isAdmin: boolean;
+};
+
+export const getAuthenticatedUser = cache(async (): Promise<User | null> => {
   const supabase = await createClient();
 
   const {
@@ -13,9 +20,9 @@ export async function getAuthenticatedUser(): Promise<User | null> {
   } = await supabase.auth.getUser();
 
   return user;
-}
+});
 
-export async function getUserRole(userId: string): Promise<UserRole> {
+export const getUserRole = cache(async (userId: string): Promise<UserRole> => {
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -27,9 +34,25 @@ export async function getUserRole(userId: string): Promise<UserRole> {
   const profile = data as { role: UserRole } | null;
 
   return profile?.role ?? "employee";
-}
+});
 
-export async function isAdmin(userId: string): Promise<boolean> {
+export const isAdmin = cache(async (userId: string): Promise<boolean> => {
   const role = await getUserRole(userId);
   return role === "admin";
-}
+});
+
+export const getSessionContext = cache(async (): Promise<SessionContext | null> => {
+  const user = await getAuthenticatedUser();
+
+  if (!user) {
+    return null;
+  }
+
+  const role = await getUserRole(user.id);
+
+  return {
+    user,
+    role,
+    isAdmin: role === "admin",
+  };
+});
