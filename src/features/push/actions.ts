@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/infrastructure/supabase/server";
+import { getPublicVapidKey } from "@/infrastructure/push/vapid";
 import { getAuthenticatedUser } from "@/shared/lib/auth";
 import type { TablesInsert } from "@/shared/types/database.types";
 
@@ -112,5 +113,5 @@ export async function removePushSubscription(endpoint: string): Promise<PushActi
 }
 
 export async function getPublicPushVapidKey(): Promise<string | null> {
-  return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null;
+  return getPublicVapidKey();
 }
