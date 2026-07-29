@@ -6,7 +6,7 @@ type PdfDocumentViewerProps = {
   fileBlob: Blob;
   onCurrentPageChange?: (page: number) => void;
   onRenderProgress?: (renderedPages: number, totalPages: number) => void;
-  onLoadError?: () => void;
+  onLoadError?: (message: string) => void;
 };
 
 type PageRenderState = {
@@ -26,8 +26,15 @@ export function PdfDocumentViewer({
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const pdfDocumentRef = useRef<{ destroy: () => Promise<void> } | null>(null);
   const renderTaskRef = useRef<{ cancel?: () => void } | null>(null);
+  const onCurrentPageChangeRef = useRef(onCurrentPageChange);
+  const onRenderProgressRef = useRef(onRenderProgress);
+  const onLoadErrorRef = useRef(onLoadError);
   const [pages, setPages] = useState<PageRenderState[]>([]);
   const [isRendering, setIsRendering] = useState(true);
+
+  onCurrentPageChangeRef.current = onCurrentPageChange;
+  onRenderProgressRef.current = onRenderProgress;
+  onLoadErrorRef.current = onLoadError;
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +58,7 @@ export function PdfDocumentViewer({
         }
 
         pdfDocumentRef.current = pdfDocument;
-        onRenderProgress?.(0, pdfDocument.numPages);
+        onRenderProgressRef.current?.(0, pdfDocument.numPages);
 
         const containerWidth = scrollRef.current?.clientWidth ?? window.innerWidth;
         const availableWidth = Math.max(containerWidth - 32, 280);
@@ -93,13 +100,15 @@ export function PdfDocumentViewer({
 
           if (!cancelled) {
             setPages([...renderedPages]);
-            onRenderProgress?.(renderedPages.length, pdfDocument.numPages);
+            onRenderProgressRef.current?.(renderedPages.length, pdfDocument.numPages);
           }
         }
       } catch (error) {
         if (!cancelled) {
+          const message =
+            error instanceof Error ? error.message : "Unknown PDF rendering error";
           console.error("PDF render error:", error);
-          onLoadError?.();
+          onLoadErrorRef.current?.(message);
         }
       } finally {
         if (!cancelled) {
@@ -120,7 +129,7 @@ export function PdfDocumentViewer({
         pdfDocumentRef.current = null;
       }
     };
-  }, [fileBlob, onLoadError, onRenderProgress]);
+  }, [fileBlob]);
 
   useEffect(() => {
     if (pages.length === 0) {
@@ -148,7 +157,7 @@ export function PdfDocumentViewer({
         const pageNumber = Number(topEntry.target.getAttribute("data-page-number"));
 
         if (pageNumber > 0) {
-          onCurrentPageChange?.(pageNumber);
+          onCurrentPageChangeRef.current?.(pageNumber);
         }
       },
       {
@@ -164,7 +173,7 @@ export function PdfDocumentViewer({
     return () => {
       observer.disconnect();
     };
-  }, [pages, onCurrentPageChange]);
+  }, [pages]);
 
   const setPageRef = useCallback((pageNumber: number, element: HTMLDivElement | null) => {
     if (element) {

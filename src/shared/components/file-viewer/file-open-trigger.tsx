@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 
@@ -36,6 +36,9 @@ export function FileOpenTrigger({
   className,
 }: FileOpenTriggerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const handleClose = useCallback(() => {
+    setIsOpen(false);
+  }, []);
 
   return (
     <>
@@ -49,17 +52,15 @@ export function FileOpenTrigger({
         {label}
       </Button>
 
-      {isOpen ? (
-        <FileViewer
-          open={isOpen}
-          onClose={() => setIsOpen(false)}
-          downloadUrl={downloadUrl}
-          filename={filename}
-          mimeType={mimeType}
-          fileTypeLabel={fileTypeLabel}
-          sizeBytes={sizeBytes}
-        />
-      ) : null}
+      <FileViewer
+        open={isOpen}
+        onClose={handleClose}
+        downloadUrl={downloadUrl}
+        filename={filename}
+        mimeType={mimeType}
+        fileTypeLabel={fileTypeLabel}
+        sizeBytes={sizeBytes}
+      />
     </>
   );
 }

@@ -52,7 +52,11 @@ export function FileViewer({
   sizeBytes,
 }: FileViewerProps) {
   const titleId = useId();
-  const pushedHistoryRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  const openRef = useRef(open);
+  const historyActiveRef = useRef(false);
+  const ignoreNextPopStateRef = useRef(false);
+  const handleCloseRef = useRef<() => void>(() => {});
   const fileBlobRef = useRef<Blob | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -60,6 +64,7 @@ export function FileViewer({
   const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [fileBlob, setFileBlob] = useState<Blob | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -67,6 +72,9 @@ export function FileViewer({
   const [isSharing, setIsSharing] = useState(false);
   const [shareError, setShareError] = useState("");
   const [shareFallbackMessage, setShareFallbackMessage] = useState("");
+
+  onCloseRef.current = onClose;
+  openRef.current = open;
 
   const formattedSize = formatFileSize(sizeBytes);
   const showInlinePreview = canPreviewInline(mimeType);
@@ -76,6 +84,7 @@ export function FileViewer({
     fileBlobRef.current = null;
     setFileBlob(null);
     setHasError(false);
+    setErrorMessage("");
     setIsLoading(false);
     setCurrentPage(1);
     setTotalPages(0);
@@ -85,15 +94,31 @@ export function FileViewer({
     setShareFallbackMessage("");
   }, []);
 
-  const handleClose = useCallback(() => {
-    if (pushedHistoryRef.current) {
-      pushedHistoryRef.current = false;
-      window.history.back();
+  const closeViewer = useCallback(() => {
+    if (!openRef.current) {
       return;
     }
 
-    onClose();
-  }, [onClose]);
+    openRef.current = false;
+    onCloseRef.current();
+  }, []);
+
+  const syncHistoryAfterClose = useCallback(() => {
+    if (!historyActiveRef.current) {
+      return;
+    }
+
+    historyActiveRef.current = false;
+    ignoreNextPopStateRef.current = true;
+    window.history.back();
+  }, []);
+
+  const handleClose = useCallback(() => {
+    closeViewer();
+    syncHistoryAfterClose();
+  }, [closeViewer, syncHistoryAfterClose]);
+
+  handleCloseRef.current = handleClose;
 
   const handleSwipeTouchStart = useCallback((event: React.TouchEvent<HTMLElement>) => {
     if (event.touches.length > 1) {
@@ -195,6 +220,11 @@ export function FileViewer({
     }
   }, [ensureFileBlob, filename]);
 
+  const handlePdfLoadError = useCallback((message: string) => {
+    setErrorMessage(message);
+    setHasError(true);
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -202,22 +232,35 @@ export function FileViewer({
   useEffect(() => {
     if (!open) {
       document.body.style.overflow = "";
+      historyActiveRef.current = false;
       resetViewerState();
       return;
     }
 
     document.body.style.overflow = "hidden";
-    window.history.pushState({ nextlevelFileViewer: true }, "");
-    pushedHistoryRef.current = true;
+
+    if (!historyActiveRef.current) {
+      window.history.pushState({ nextlevelFileViewer: true }, "");
+      historyActiveRef.current = true;
+    }
 
     function handlePopState() {
-      pushedHistoryRef.current = false;
-      onClose();
+      if (ignoreNextPopStateRef.current) {
+        ignoreNextPopStateRef.current = false;
+        return;
+      }
+
+      if (!historyActiveRef.current || !openRef.current) {
+        return;
+      }
+
+      historyActiveRef.current = false;
+      closeViewer();
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        handleClose();
+        handleCloseRef.current();
       }
     }
 
@@ -225,11 +268,10 @@ export function FileViewer({
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.body.style.overflow = "";
       window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open, onClose, handleClose, resetViewerState]);
+  }, [open, closeViewer, resetViewerState]);
 
   useEffect(() => {
     if (!open) {
@@ -242,6 +284,7 @@ export function FileViewer({
     async function loadFile() {
       setIsLoading(true);
       setHasError(false);
+      setErrorMessage("");
       setFileBlob(null);
       fileBlobRef.current = null;
       setCurrentPage(1);
@@ -259,7 +302,10 @@ export function FileViewer({
         }
       } catch (error) {
         if (!cancelled && !(error instanceof DOMException && error.name === "AbortError")) {
+          const message =
+            error instanceof Error ? error.message : "Unknown file loading error";
           console.error("File viewer load error:", error);
+          setErrorMessage(message);
           setHasError(true);
         }
       } finally {
@@ -296,6 +342,22 @@ export function FileViewer({
       ? `Завантаження... ${renderedPages}/${totalPages}`
       : null;
 
+  const errorActions = (
+    <div className="flex flex-wrap justify-center gap-3">
+      <Button type="button" onClick={() => void handleDownload()}>
+        <Download />
+        Завантажити файл
+      </Button>
+      <Button type="button" variant="outline" disabled={isSharing} onClick={() => void handleShare()}>
+        <Share2 />
+        {isSharing ? "Підготовка файлу..." : "Поділитися"}
+      </Button>
+      <Button type="button" variant="outline" onClick={handleClose}>
+        ✕ Закрити
+      </Button>
+    </div>
+  );
+
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex flex-col bg-background"
@@ -328,7 +390,7 @@ export function FileViewer({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={isLoading || hasError || isSharing}
+                disabled={isLoading || isSharing}
                 onClick={() => void handleShare()}
               >
                 <Share2 className="size-4" />
@@ -373,10 +435,10 @@ export function FileViewer({
         {hasError ? (
           <div className="flex min-h-[50dvh] flex-col items-center justify-center gap-4 px-4 text-center">
             <p className="text-sm text-destructive">Не вдалося відкрити документ</p>
-            <Button type="button" onClick={() => void handleDownload()}>
-              <Download />
-              Завантажити файл
-            </Button>
+            {errorMessage ? (
+              <p className="max-w-lg break-words text-xs text-muted-foreground">{errorMessage}</p>
+            ) : null}
+            {errorActions}
           </div>
         ) : null}
 
@@ -385,7 +447,7 @@ export function FileViewer({
             fileBlob={fileBlob}
             onCurrentPageChange={setCurrentPage}
             onRenderProgress={handleRenderProgress}
-            onLoadError={() => setHasError(true)}
+            onLoadError={handlePdfLoadError}
           />
         ) : null}
 
