@@ -75,6 +75,11 @@ export function UploadDocumentForm({ categories, onSuccess }: UploadDocumentForm
       }
 
       setSuccessMessage("Документ завантажено.");
+
+      if (result.pushWarning) {
+        setSuccessMessage((current) => `${current} ${result.pushWarning}`);
+      }
+
       onSuccess?.();
     } catch (error) {
       const message =

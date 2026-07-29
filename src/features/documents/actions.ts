@@ -14,6 +14,7 @@ import {
   resolveOriginalFilename,
 } from "@/features/documents/lib/mime-type";
 import { buildDocumentStoragePath } from "@/features/documents/lib/storage-path";
+import { notifyDocumentCreated } from "@/infrastructure/push/triggers";
 import { createClient } from "@/infrastructure/supabase/server";
 import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
 import type { Tables, TablesInsert, TablesUpdate } from "@/shared/types/database.types";
@@ -25,7 +26,9 @@ export type DocumentCategoryWithDocuments = DocumentCategory & {
   documents: Document[];
 };
 
-type ActionResult = { success: true } | { success: false; error: string };
+type ActionResult =
+  | { success: true; pushWarning?: string }
+  | { success: false; error: string };
 
 function defaultTitleFromFilename(filename: string): string {
   const trimmed = filename.trim();
@@ -313,7 +316,7 @@ export async function uploadDocument(formData: FormData): Promise<ActionResult> 
 
   const { data: category, error: categoryError } = await supabase
     .from("document_categories")
-    .select("id")
+    .select("id, name")
     .eq("id", categoryId)
     .maybeSingle();
 
@@ -346,19 +349,33 @@ export async function uploadDocument(formData: FormData): Promise<ActionResult> 
     uploaded_by: user.id,
   };
 
-  const { error: insertError } = await supabase
+  const { data: savedDocument, error: insertError } = await supabase
     .from("documents")
-    .insert(insertPayload as never);
+    .insert(insertPayload as never)
+    .select("id")
+    .single();
 
-  if (insertError) {
+  if (insertError || !savedDocument) {
     await supabase.storage.from(DOCUMENTS_STORAGE_BUCKET).remove([storagePath]);
-    console.error("Failed to save document metadata:", insertError.message);
+    console.error("Failed to save document metadata:", insertError?.message);
     return { success: false, error: "Не вдалося зберегти метадані документа." };
   }
 
   revalidatePath("/documents");
 
-  return { success: true };
+  let pushWarning: string | undefined;
+
+  try {
+    pushWarning = await notifyDocumentCreated(
+      (savedDocument as { id: string }).id,
+      title,
+      (category as { name: string }).name,
+    );
+  } catch (error) {
+    console.error("Document push notification failed:", error);
+  }
+
+  return { success: true, pushWarning };
 }
 
 export async function renameDocument(documentId: string, formData: FormData): Promise<ActionResult> {

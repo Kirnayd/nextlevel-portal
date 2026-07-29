@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PushNotificationSettings } from "@/shared/components/pwa/push-notification-settings";
 import { getSessionContext } from "@/shared/lib/auth";
 
 export default async function DashboardPage() {
@@ -66,6 +67,8 @@ export default async function DashboardPage() {
             </Link>
           ) : null}
         </div>
+
+        <PushNotificationSettings />
 
         <form action="/api/logout" method="post" className="mt-6">
           <button

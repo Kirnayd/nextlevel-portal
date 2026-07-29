@@ -8,6 +8,7 @@ import {
   QUESTION_SUBJECT_MAX_LENGTH,
   type QuestionFilter,
 } from "@/features/questions/constants";
+import { notifyQuestionAnswered } from "@/infrastructure/push/triggers";
 import { createClient } from "@/infrastructure/supabase/server";
 import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
 import type { Enums, Tables, TablesInsert } from "@/shared/types/database.types";
@@ -25,7 +26,9 @@ export type QuestionWithAnswer = Question & {
   author: QuestionAuthor | null;
 };
 
-type ActionResult = { success: true } | { success: false; error: string };
+type ActionResult =
+  | { success: true; pushWarning?: string }
+  | { success: false; error: string };
 
 type RawQuestionRow = Question & {
   answers: Answer[] | null;
@@ -247,6 +250,16 @@ export async function submitAnswer(
 
   const supabase = await createClient();
 
+  const { data: question, error: questionError } = await supabase
+    .from("questions")
+    .select("user_id, subject")
+    .eq("id", questionId)
+    .maybeSingle();
+
+  if (questionError || !question) {
+    return { success: false, error: "Запитання не знайдено." };
+  }
+
   const { data: existingAnswer, error: existingAnswerError } = await supabase
     .from("answers")
     .select("id")
@@ -268,12 +281,14 @@ export async function submitAnswer(
     message,
   };
 
-  const { error: answerError } = await supabase
+  const { data: savedAnswer, error: answerError } = await supabase
     .from("answers")
-    .insert(answerPayload as never);
+    .insert(answerPayload as never)
+    .select("id")
+    .single();
 
-  if (answerError) {
-    console.error("Failed to save answer:", answerError.message);
+  if (answerError || !savedAnswer) {
+    console.error("Failed to save answer:", answerError?.message);
     return { success: false, error: "Не вдалося зберегти відповідь." };
   }
 
@@ -289,5 +304,17 @@ export async function submitAnswer(
 
   revalidatePath("/questions");
 
-  return { success: true };
+  let pushWarning: string | undefined;
+
+  try {
+    pushWarning = await notifyQuestionAnswered(
+      (savedAnswer as { id: string }).id,
+      (question as { user_id: string; subject: string }).user_id,
+      (question as { user_id: string; subject: string }).subject,
+    );
+  } catch (error) {
+    console.error("Question answer push notification failed:", error);
+  }
+
+  return { success: true, pushWarning };
 }

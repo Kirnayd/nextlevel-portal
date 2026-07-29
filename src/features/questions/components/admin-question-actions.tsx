@@ -65,6 +65,10 @@ export function AdminQuestionActions({ question }: AdminQuestionActionsProps) {
 
       event.currentTarget.reset();
       setSuccessMessage("Відповідь збережено.");
+
+      if (result.pushWarning) {
+        setSuccessMessage((current) => `${current} ${result.pushWarning}`);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Невідома помилка під час збереження відповіді.";

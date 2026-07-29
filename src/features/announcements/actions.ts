@@ -16,6 +16,7 @@ import {
   sortAnnouncementImages,
 } from "@/features/announcements/lib/image-storage";
 import { formatSupabaseError, logSupabaseError } from "@/features/announcements/lib/supabase-error";
+import { notifyAnnouncementPublished } from "@/infrastructure/push/triggers";
 import { createClient } from "@/infrastructure/supabase/server";
 import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
 import type { Tables, TablesInsert, TablesUpdate } from "@/shared/types/database.types";
@@ -27,7 +28,21 @@ export type AnnouncementWithImages = Announcement & {
   images: AnnouncementImage[];
 };
 
-type ActionResult = { success: true } | { success: false; error: string };
+type ActionResult =
+  | { success: true; pushWarning?: string }
+  | { success: false; error: string };
+
+async function runAnnouncementPublishedPush(
+  announcementId: string,
+  title: string,
+): Promise<string | undefined> {
+  try {
+    return await notifyAnnouncementPublished(announcementId, title);
+  } catch (error) {
+    console.error("Announcement push notification failed:", error);
+    return undefined;
+  }
+}
 
 function parsePublishedFromForm(formData: FormData): boolean {
   return formData.get("is_published") === "on";
@@ -180,7 +195,16 @@ export async function createAnnouncement(formData: FormData): Promise<ActionResu
 
   revalidatePath("/announcements");
 
-  return { success: true };
+  let pushWarning: string | undefined;
+
+  if (insertPayload.is_published) {
+    pushWarning = await runAnnouncementPublishedPush(
+      (data as Announcement).id,
+      insertPayload.title,
+    );
+  }
+
+  return { success: true, pushWarning };
 }
 
 export async function updateAnnouncement(
@@ -214,6 +238,16 @@ export async function updateAnnouncement(
 
   const supabase = await createClient();
 
+  const { data: existingAnnouncement, error: existingError } = await supabase
+    .from("announcements")
+    .select("is_published")
+    .eq("id", announcementId)
+    .maybeSingle();
+
+  if (existingError || !existingAnnouncement) {
+    return { success: false, error: "Оголошення не знайдено." };
+  }
+
   const { data, error } = await supabase
     .from("announcements")
     .update(updatePayload as never)
@@ -233,7 +267,18 @@ export async function updateAnnouncement(
 
   revalidatePath("/announcements");
 
-  return { success: true };
+  let pushWarning: string | undefined;
+  const wasPublished = (existingAnnouncement as { is_published: boolean }).is_published;
+  const isNowPublished = updatePayload.is_published ?? false;
+
+  if (!wasPublished && isNowPublished) {
+    pushWarning = await runAnnouncementPublishedPush(
+      announcementId,
+      updatePayload.title ?? "",
+    );
+  }
+
+  return { success: true, pushWarning };
 }
 
 async function removeAnnouncementImagesFromStorage(storagePaths: string[]): Promise<void> {
@@ -346,7 +391,7 @@ export async function togglePublished(announcementId: string): Promise<ActionRes
 
   const { data, error: loadError } = await supabase
     .from("announcements")
-    .select("is_published")
+    .select("is_published, title")
     .eq("id", announcementId)
     .maybeSingle();
 
@@ -354,7 +399,7 @@ export async function togglePublished(announcementId: string): Promise<ActionRes
     return { success: false, error: "Оголошення не знайдено." };
   }
 
-  const current = data as { is_published: boolean };
+  const current = data as { is_published: boolean; title: string };
 
   const { error } = await supabase
     .from("announcements")
@@ -368,7 +413,13 @@ export async function togglePublished(announcementId: string): Promise<ActionRes
 
   revalidatePath("/announcements");
 
-  return { success: true };
+  let pushWarning: string | undefined;
+
+  if (!current.is_published) {
+    pushWarning = await runAnnouncementPublishedPush(announcementId, current.title);
+  }
+
+  return { success: true, pushWarning };
 }
 
 export async function uploadAnnouncementImage(

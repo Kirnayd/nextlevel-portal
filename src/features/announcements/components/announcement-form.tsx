@@ -61,6 +61,11 @@ export function AnnouncementForm({
       }
 
       setSuccessMessage(mode === "create" ? "Оголошення створено." : "Оголошення збережено.");
+
+      if (result.pushWarning) {
+        setSuccessMessage((current) => `${current} ${result.pushWarning}`);
+      }
+
       onSuccess?.();
     } catch (error) {
       const message =

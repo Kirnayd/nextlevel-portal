@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/infrastructure/supabase/server";
+import { notifyPriceUpdated } from "@/infrastructure/push/triggers";
 import {
   PRICE_ALLOWED_MIME_TYPES,
   PRICE_CATEGORY,
@@ -16,7 +17,7 @@ import type { Tables, TablesInsert, TablesUpdate } from "@/shared/types/database
 export type PriceFile = Tables<"files">;
 
 export type UploadPriceResult =
-  | { success: true }
+  | { success: true; pushWarning?: string }
   | { success: false; error: string };
 
 function sanitizeFilename(filename: string): string {
@@ -136,5 +137,17 @@ export async function uploadPriceFile(formData: FormData): Promise<UploadPriceRe
 
   revalidatePath("/price");
 
-  return { success: true };
+  let pushWarning: string | undefined;
+
+  try {
+    const updatedPriceFile = await getCurrentPriceFile();
+
+    if (updatedPriceFile) {
+      pushWarning = await notifyPriceUpdated(updatedPriceFile.id, updatedPriceFile.updated_at);
+    }
+  } catch (error) {
+    console.error("Price push notification failed:", error);
+  }
+
+  return { success: true, pushWarning };
 }
