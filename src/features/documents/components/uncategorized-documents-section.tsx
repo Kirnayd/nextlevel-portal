@@ -5,15 +5,18 @@ import { FolderOpen } from "lucide-react";
 import type { Document, DocumentCategoryWithDocuments } from "@/features/documents/actions";
 import { UNCATEGORIZED_SUBCATEGORY_LABEL } from "@/features/documents/constants";
 import { DocumentRow } from "@/features/documents/components/document-row";
+import { formatSubcategoryHeading } from "@/features/documents/lib/format";
 
 type UncategorizedDocumentsSectionProps = {
   documents: Document[];
+  documentCount: number;
   allCategories: DocumentCategoryWithDocuments[];
   isAdmin: boolean;
 };
 
 export function UncategorizedDocumentsSection({
   documents,
+  documentCount,
   allCategories,
   isAdmin,
 }: UncategorizedDocumentsSectionProps) {
@@ -28,7 +31,7 @@ export function UncategorizedDocumentsSection({
           <div className="flex min-w-0 items-start gap-3">
             <FolderOpen className="mt-0.5 size-4 shrink-0 text-primary" />
             <p className="font-medium">
-              {UNCATEGORIZED_SUBCATEGORY_LABEL} · {documents.length}
+              {formatSubcategoryHeading(UNCATEGORIZED_SUBCATEGORY_LABEL, documentCount)}
             </p>
           </div>
           <span className="text-sm text-muted-foreground group-open:hidden">Розгорнути</span>

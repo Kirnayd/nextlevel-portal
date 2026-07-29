@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { uploadDocument } from "@/features/documents/actions";
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
@@ -42,6 +43,7 @@ function buildUploadPayload(form: HTMLFormElement, file: File): FormData {
 }
 
 export function UploadDocumentForm({ categories, onSuccess }: UploadDocumentFormProps) {
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id ?? "");
@@ -97,6 +99,7 @@ export function UploadDocumentForm({ categories, onSuccess }: UploadDocumentForm
         setSuccessMessage((current) => `${current} ${result.pushWarning}`);
       }
 
+      router.refresh();
       onSuccess?.();
     } catch (error) {
       const message =

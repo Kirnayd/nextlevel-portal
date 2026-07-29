@@ -54,6 +54,12 @@ export function CategorySection({
   const hasVisibleContent =
     category.subcategories.length > 0 || category.uncategorizedDocuments.length > 0;
 
+  const uncategorizedDocumentCount = useMemo(() => {
+    const fullCategory = allCategories.find((item) => item.id === category.id);
+
+    return fullCategory?.uncategorizedDocuments.length ?? category.uncategorizedDocuments.length;
+  }, [allCategories, category]);
+
   const staticSubcategoryList = useMemo(
     () =>
       category.subcategories.map((subcategory) => (
@@ -138,6 +144,7 @@ export function CategorySection({
 
               <UncategorizedDocumentsSection
                 documents={category.uncategorizedDocuments}
+                documentCount={uncategorizedDocumentCount}
                 allCategories={allCategories}
                 isAdmin={isAdmin}
               />

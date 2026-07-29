@@ -26,6 +26,10 @@ export function getMimeTypeLabel(mimeType: string): string {
   );
 }
 
+export function formatSubcategoryHeading(name: string, documentCount: number): string {
+  return `${name} (${documentCount})`;
+}
+
 export function buildContentDisposition(
   originalFilename: string,
   disposition: "inline" | "attachment",

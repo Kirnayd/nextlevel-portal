@@ -10,6 +10,7 @@ import type {
   DocumentSubcategoryWithDocuments,
 } from "@/features/documents/actions";
 import { DocumentRow } from "@/features/documents/components/document-row";
+import { formatSubcategoryHeading } from "@/features/documents/lib/format";
 
 const AdminSubcategoryActions = dynamic(
   () =>
@@ -42,7 +43,7 @@ export function SubcategorySection({
             {dragHandle}
             <FolderOpen className="mt-0.5 size-4 shrink-0 text-primary" />
             <p className="font-medium">
-              {subcategory.name} · {subcategory.documents.length}
+              {formatSubcategoryHeading(subcategory.name, totalDocumentCount)}
             </p>
           </div>
           <span className="text-sm text-muted-foreground group-open:hidden">Розгорнути</span>
