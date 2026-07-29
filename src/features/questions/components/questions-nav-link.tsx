@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { getNewQuestionsCount } from "@/features/questions/actions";
 import { NewQuestionsBadge } from "@/features/questions/components/new-questions-badge";
@@ -13,7 +12,6 @@ type QuestionsNavLinkProps = {
 };
 
 export function QuestionsNavLink({ initialCount }: QuestionsNavLinkProps) {
-  const router = useRouter();
   const [count, setCount] = useState(initialCount);
 
   useEffect(() => {
@@ -33,7 +31,6 @@ export function QuestionsNavLink({ initialCount }: QuestionsNavLinkProps) {
     function handleVisibilityChange() {
       if (document.visibilityState === "visible") {
         void refreshCount();
-        router.refresh();
       }
     }
 
@@ -42,7 +39,7 @@ export function QuestionsNavLink({ initialCount }: QuestionsNavLinkProps) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [refreshCount, router]);
+  }, [refreshCount]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -58,7 +55,6 @@ export function QuestionsNavLink({ initialCount }: QuestionsNavLinkProps) {
         },
         () => {
           void refreshCount();
-          router.refresh();
         },
       )
       .subscribe();
@@ -66,7 +62,7 @@ export function QuestionsNavLink({ initialCount }: QuestionsNavLinkProps) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [refreshCount, router]);
+  }, [refreshCount]);
 
   return (
     <Link

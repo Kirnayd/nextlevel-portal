@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { markPriceRead } from "@/features/unread/actions";
@@ -10,7 +9,6 @@ type PriceReadTrackerProps = {
 };
 
 export function PriceReadTracker({ fileId }: PriceReadTrackerProps) {
-  const router = useRouter();
   const markedFileIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -21,13 +19,11 @@ export function PriceReadTracker({ fileId }: PriceReadTrackerProps) {
     markedFileIdRef.current = fileId;
 
     void markPriceRead(fileId).then((result) => {
-      if (result.success) {
-        router.refresh();
-      } else {
+      if (!result.success) {
         markedFileIdRef.current = null;
       }
     });
-  }, [fileId, router]);
+  }, [fileId]);
 
   return null;
 }

@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { DashboardPushSettings } from "@/features/dashboard/components/dashboard-push-settings";
 import { NotificationCenter } from "@/features/notifications/components/notification-center";
 import { fetchUnreadNotificationCount } from "@/features/notifications/actions";
 import { getNewQuestionsCount } from "@/features/questions/actions";
 import { QuestionsNavLink } from "@/features/questions/components/questions-nav-link";
 import { getEmployeeUnreadCounts } from "@/features/unread/actions";
 import { EmployeeDashboardNav } from "@/features/unread/components/employee-dashboard-nav";
-import { PushNotificationSettings } from "@/shared/components/pwa/push-notification-settings";
 import { getSessionContext } from "@/shared/lib/auth";
 
 export default async function DashboardPage() {
@@ -80,7 +80,7 @@ export default async function DashboardPage() {
           ) : null}
         </div>
 
-        <PushNotificationSettings />
+        <DashboardPushSettings />
 
         <form action="/api/logout" method="post" className="mt-6">
           <button

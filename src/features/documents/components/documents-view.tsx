@@ -6,8 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
 import { CategoryList } from "@/features/documents/components/category-list";
 import { DocumentsControls } from "@/features/documents/components/documents-controls";
+import { getCategoryDocumentCount } from "@/features/documents/lib/category-helpers";
 import { filterCategoriesForDisplay } from "@/features/documents/lib/filter-categories";
 import { useHideEmptyCategoriesPreference } from "@/features/documents/lib/use-hide-empty-categories";
+import { useDebouncedValue } from "@/shared/lib/use-debounced-value";
 import {
   Card,
   CardDescription,
@@ -38,6 +40,7 @@ type DocumentsViewProps = {
 
 export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 250);
   const [orderedCategories, setOrderedCategories] = useState(categories);
   const { hideEmpty, setHideEmpty, isReady: preferencesReady } =
     useHideEmptyCategoriesPreference(true);
@@ -47,12 +50,14 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
   }, [categories]);
 
   const visibleCategories = useMemo(
-    () => filterCategoriesForDisplay(orderedCategories, searchQuery, hideEmpty, isAdmin),
-    [orderedCategories, searchQuery, hideEmpty, isAdmin],
+    () =>
+      filterCategoriesForDisplay(orderedCategories, debouncedSearchQuery, hideEmpty, isAdmin),
+    [orderedCategories, debouncedSearchQuery, hideEmpty, isAdmin],
   );
 
   const documentCountByCategoryId = useMemo(
-    () => new Map(orderedCategories.map((category) => [category.id, category.documents.length])),
+    () =>
+      new Map(orderedCategories.map((category) => [category.id, getCategoryDocumentCount(category)])),
     [orderedCategories],
   );
 
@@ -73,8 +78,8 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
     return counts;
   }, [orderedCategories]);
 
-  const isDragEnabled = isAdmin && searchQuery.trim().length === 0;
-  const hasSearchQuery = searchQuery.trim().length > 0;
+  const isDragEnabled = isAdmin && debouncedSearchQuery.trim().length === 0;
+  const hasSearchQuery = debouncedSearchQuery.trim().length > 0;
   const hasCategories = orderedCategories.length > 0;
 
   return (

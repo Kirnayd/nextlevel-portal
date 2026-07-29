@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getQuestions } from "@/features/questions/actions";
@@ -48,7 +49,9 @@ export default async function QuestionsPage({ searchParams }: QuestionsPageProps
           </div>
 
           <Button asChild variant="outline" className="shrink-0">
-            <a href="/dashboard">На головну</a>
+            <Link href="/dashboard" prefetch>
+              На головну
+            </Link>
           </Button>
         </div>
 

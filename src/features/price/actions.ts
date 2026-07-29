@@ -39,7 +39,7 @@ export async function getCurrentPriceFile(): Promise<PriceFile | null> {
 
   const { data, error } = await supabase
     .from("files")
-    .select("*")
+    .select("id, original_filename, mime_type, size_bytes, updated_at, category")
     .eq("category", PRICE_CATEGORY)
     .maybeSingle();
 

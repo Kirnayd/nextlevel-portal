@@ -31,7 +31,6 @@ export type DocumentSubcategoryWithDocuments = DocumentSubcategory & {
 export type DocumentCategoryWithDocuments = DocumentCategory & {
   subcategories: DocumentSubcategoryWithDocuments[];
   uncategorizedDocuments: Document[];
-  documents: Document[];
 };
 
 type ActionResult =
@@ -123,15 +122,20 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
   ] = await Promise.all([
     supabase
       .from("document_categories")
-      .select("*")
+      .select("id, name, sort_order, created_at, updated_at")
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
     supabase
       .from("document_subcategories")
-      .select("*")
+      .select("id, category_id, name, sort_order, created_at, updated_at")
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
-    supabase.from("documents").select("*").order("created_at", { ascending: false }),
+    supabase
+      .from("documents")
+      .select(
+        "id, category_id, subcategory_id, title, original_filename, mime_type, size_bytes, sort_order, created_at, updated_at",
+      )
+      .order("created_at", { ascending: false }),
   ]);
 
   if (categoriesError) {
@@ -179,16 +183,11 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
   return ((categories ?? []) as DocumentCategory[]).map((category) => {
     const categorySubcategories = subcategoriesByCategory.get(category.id) ?? [];
     const uncategorizedDocuments = uncategorizedByCategory.get(category.id) ?? [];
-    const categoryDocuments = [
-      ...categorySubcategories.flatMap((subcategory) => subcategory.documents),
-      ...uncategorizedDocuments,
-    ];
 
     return {
       ...category,
       subcategories: categorySubcategories,
       uncategorizedDocuments,
-      documents: categoryDocuments,
     };
   });
 }

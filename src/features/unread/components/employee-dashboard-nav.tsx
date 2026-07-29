@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import type { EmployeeUnreadCounts } from "@/features/unread/actions";
 import { getEmployeeUnreadCounts } from "@/features/unread/actions";
@@ -16,7 +15,6 @@ const navLinkClassName =
   "relative inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90";
 
 export function EmployeeDashboardNav({ initialCounts }: EmployeeDashboardNavProps) {
-  const router = useRouter();
   const [counts, setCounts] = useState(initialCounts);
 
   useEffect(() => {
@@ -27,7 +25,6 @@ export function EmployeeDashboardNav({ initialCounts }: EmployeeDashboardNavProp
     function handleVisibilityChange() {
       if (document.visibilityState === "visible") {
         void getEmployeeUnreadCounts().then(setCounts);
-        router.refresh();
       }
     }
 
@@ -36,7 +33,7 @@ export function EmployeeDashboardNav({ initialCounts }: EmployeeDashboardNavProp
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [router]);
+  }, []);
 
   return (
     <>

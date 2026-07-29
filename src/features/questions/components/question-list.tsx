@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import type { QuestionWithAnswer } from "@/features/questions/actions";
 import { AdminQuestionDelete } from "@/features/questions/components/admin-question-delete";
@@ -73,7 +72,6 @@ function QuestionCard({
   isAdmin: boolean;
   onQuestionDeleted: (questionId: string) => void;
 }) {
-  const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(isAdmin && question.status !== "answered");
   const [isAnswerVisible, setIsAnswerVisible] = useState(false);
   const [isMarkingAnswerRead, setIsMarkingAnswerRead] = useState(false);
@@ -87,11 +85,7 @@ function QuestionCard({
     setIsMarkingAnswerRead(true);
 
     try {
-      const result = await markQuestionAnswerRead(question.id);
-
-      if (result.success) {
-        router.refresh();
-      }
+      await markQuestionAnswerRead(question.id);
     } catch (error) {
       console.error("Mark question answer read error:", error);
     } finally {

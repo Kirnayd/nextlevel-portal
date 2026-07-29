@@ -131,10 +131,56 @@ export function isWorkbookTooLarge(workbook: WorkbookData): boolean {
   return workbook.sheets.some((sheet) => isWorksheetTooLarge(sheet.rowCount, sheet.colCount));
 }
 
+const LARGE_WORKBOOK_BYTES = 512 * 1024;
+
+async function parseExcelWorkbookInWorker(buffer: ArrayBuffer): Promise<WorkbookData> {
+  const worker = new Worker(new URL("./parse-excel-workbook.worker.ts", import.meta.url));
+
+  return new Promise((resolve, reject) => {
+    function cleanup() {
+      worker.terminate();
+    }
+
+    worker.onmessage = (event: MessageEvent<{ workbook?: WorkbookData; error?: string }>) => {
+      cleanup();
+
+      if (event.data.error) {
+        reject(new Error(event.data.error));
+        return;
+      }
+
+      if (!event.data.workbook) {
+        reject(new Error("Excel worker returned empty result"));
+        return;
+      }
+
+      resolve(event.data.workbook);
+    };
+
+    worker.onerror = (error) => {
+      cleanup();
+      reject(error.error ?? new Error("Excel worker failed"));
+    };
+
+    worker.postMessage({ buffer }, [buffer]);
+  });
+}
+
 export async function parseExcelWorkbook(
   buffer: ArrayBuffer,
   onProgress?: (progress: ParseProgress) => void,
 ): Promise<WorkbookData> {
+  if (buffer.byteLength >= LARGE_WORKBOOK_BYTES) {
+    onProgress?.({ phase: "parsing", sheetIndex: 0, sheetCount: 0 });
+    const workbook = await parseExcelWorkbookInWorker(buffer.slice(0));
+    onProgress?.({
+      phase: "complete",
+      sheetIndex: workbook.sheets.length,
+      sheetCount: workbook.sheets.length,
+    });
+    return workbook;
+  }
+
   const XLSX = await import("xlsx");
 
   onProgress?.({ phase: "parsing", sheetIndex: 0, sheetCount: 0 });

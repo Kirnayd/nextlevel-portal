@@ -7,7 +7,6 @@ import type { ReactNode } from "react";
 
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
 import { CreateSubcategoryDialog } from "@/features/documents/components/create-subcategory-dialog";
-import { SortableSubcategoryList } from "@/features/documents/components/sortable-subcategory-list";
 import { SubcategorySection } from "@/features/documents/components/subcategory-section";
 import { UncategorizedDocumentsSection } from "@/features/documents/components/uncategorized-documents-section";
 import {
@@ -22,6 +21,14 @@ const AdminCategoryActions = dynamic(
   () =>
     import("@/features/documents/components/admin-category-actions").then(
       (module) => module.AdminCategoryActions,
+    ),
+  { ssr: false, loading: () => null },
+);
+
+const SortableSubcategoryList = dynamic(
+  () =>
+    import("@/features/documents/components/sortable-subcategory-list").then(
+      (module) => module.SortableSubcategoryList,
     ),
   { ssr: false, loading: () => null },
 );

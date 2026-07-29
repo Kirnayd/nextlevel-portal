@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { useRef } from "react";
 
 import type { AnnouncementWithImages } from "@/features/announcements/actions";
@@ -60,7 +59,6 @@ function AnnouncementCard({
   announcement: AnnouncementWithImages;
   isAdmin: boolean;
 }) {
-  const router = useRouter();
   const markedAsReadRef = useRef(false);
   const galleryImages = announcement.images.slice(1);
 
@@ -73,12 +71,9 @@ function AnnouncementCard({
 
     const result = await markAnnouncementRead(announcement.id);
 
-    if (result.success) {
-      router.refresh();
-      return;
+    if (!result.success) {
+      markedAsReadRef.current = false;
     }
-
-    markedAsReadRef.current = false;
   }
 
   const cardBody = (

@@ -9,6 +9,7 @@ import {
   ANNOUNCEMENT_IMAGE_MAX_SIZE_BYTES,
   ANNOUNCEMENT_MAX_IMAGES,
   ANNOUNCEMENT_TITLE_MAX_LENGTH,
+  ANNOUNCEMENTS_LIST_LIMIT,
 } from "@/features/announcements/constants";
 import {
   buildAnnouncementImageStoragePath,
@@ -102,9 +103,12 @@ export async function getAnnouncements(): Promise<AnnouncementWithImages[]> {
 
   const { data, error } = await supabase
     .from("announcements")
-    .select("*, announcement_images(*)")
+    .select(
+      "id, title, content, is_pinned, is_published, created_at, updated_at, announcement_images(id, announcement_id, sort_order, created_at)",
+    )
     .order("is_pinned", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(ANNOUNCEMENTS_LIST_LIMIT);
 
   if (error) {
     logSupabaseError("Failed to load announcements", error);

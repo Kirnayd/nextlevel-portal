@@ -99,7 +99,6 @@ export function NotificationCenterPanel({
         })),
       );
       onUnreadCountChange(0);
-      router.refresh();
     });
   }
 
@@ -124,7 +123,6 @@ export function NotificationCenterPanel({
       }
       onClose();
       router.push(result.url);
-      router.refresh();
     });
   }
 

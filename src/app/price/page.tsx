@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getCurrentPriceFile } from "@/features/price/actions";
@@ -36,7 +37,9 @@ export default async function PricePage() {
           </div>
 
           <Button asChild variant="outline">
-            <a href="/dashboard">На головну</a>
+            <Link href="/dashboard" prefetch>
+              На головну
+            </Link>
           </Button>
         </div>
 

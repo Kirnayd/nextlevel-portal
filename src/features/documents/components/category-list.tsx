@@ -1,6 +1,7 @@
 "use client";
 
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
+import { getCategoryDocumentCount } from "@/features/documents/lib/category-helpers";
 import { CategorySection } from "@/features/documents/components/category-section";
 
 type CategoryListProps = {
@@ -29,7 +30,7 @@ export function CategoryList({
           key={category.id}
           category={category}
           totalDocumentCount={
-            documentCountByCategoryId.get(category.id) ?? category.documents.length
+            documentCountByCategoryId.get(category.id) ?? getCategoryDocumentCount(category)
           }
           subcategoryCount={subcategoryCountByCategoryId.get(category.id) ?? category.subcategories.length}
           allCategories={allCategories}

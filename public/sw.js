@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nextlevel-static-v3";
+const CACHE_VERSION = "nextlevel-static-v4";
 const STATIC_CACHE = `${CACHE_VERSION}-assets`;
 const NOTIFICATION_ICON = "/icons/icon-192.png";
 const NOTIFICATION_BADGE = "/icons/icon-192.png";

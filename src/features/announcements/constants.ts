@@ -6,6 +6,7 @@ export const ANNOUNCEMENT_IMAGES_STORAGE_PREFIX = "announcements";
 
 export const ANNOUNCEMENT_MAX_IMAGES = 10;
 export const ANNOUNCEMENT_IMAGE_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+export const ANNOUNCEMENTS_LIST_LIMIT = 100;
 
 export const ANNOUNCEMENT_ALLOWED_IMAGE_MIME_TYPES = [
   "image/jpeg",

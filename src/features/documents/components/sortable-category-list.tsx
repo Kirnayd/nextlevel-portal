@@ -22,6 +22,7 @@ import { GripVertical } from "lucide-react";
 import { reorderCategories } from "@/features/documents/actions";
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
 import { CategorySection } from "@/features/documents/components/category-section";
+import { getCategoryDocumentCount } from "@/features/documents/lib/category-helpers";
 import { mergeReorderedVisibleCategories } from "@/features/documents/lib/filter-categories";
 import { cn } from "@/shared/lib/utils";
 
@@ -101,7 +102,7 @@ export function SortableCategoryList({
   const [reorderError, setReorderError] = useState("");
 
   const documentCountByCategoryId = useMemo(
-    () => new Map(allCategories.map((category) => [category.id, category.documents.length])),
+    () => new Map(allCategories.map((category) => [category.id, getCategoryDocumentCount(category)])),
     [allCategories],
   );
 
@@ -213,7 +214,7 @@ export function SortableCategoryList({
                 key={category.id}
                 category={category}
                 totalDocumentCount={
-                  documentCountByCategoryId.get(category.id) ?? category.documents.length
+                  documentCountByCategoryId.get(category.id) ?? getCategoryDocumentCount(category)
                 }
                 subcategoryCount={
                   subcategoryCountByCategoryId.get(category.id) ?? category.subcategories.length

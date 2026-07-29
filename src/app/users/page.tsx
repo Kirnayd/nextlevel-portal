@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getUsers } from "@/features/users/actions";
@@ -35,7 +36,9 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
           </div>
 
           <Button asChild variant="outline" className="shrink-0">
-            <a href="/dashboard">На головну</a>
+            <Link href="/dashboard" prefetch>
+              На головну
+            </Link>
           </Button>
         </div>
 

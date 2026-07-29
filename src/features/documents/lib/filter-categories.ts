@@ -1,5 +1,6 @@
 import type { DocumentCategoryWithDocuments } from "@/features/documents/actions";
 import { UNCATEGORIZED_SUBCATEGORY_LABEL } from "@/features/documents/constants";
+import { getCategoryDocumentCount } from "@/features/documents/lib/category-helpers";
 
 function documentMatchesQuery(
   documentTitle: string,
@@ -85,19 +86,15 @@ export function filterCategoriesForDisplay(
         );
       });
 
-      const documents = [
-        ...subcategories.flatMap((subcategory) => subcategory.documents),
-        ...uncategorizedDocuments,
-      ];
-
       return {
         ...category,
         subcategories,
         uncategorizedDocuments,
-        documents,
       };
     })
     .filter((category) => {
+      const documentCount = getCategoryDocumentCount(category);
+
       if (normalizedQuery) {
         const categoryNameMatches = category.name.toLowerCase().includes(normalizedQuery);
         const hasSubcategoryNameMatch = category.subcategories.some((subcategory) =>
@@ -105,14 +102,14 @@ export function filterCategoriesForDisplay(
         );
 
         if (categoryNameMatches || hasSubcategoryNameMatch) {
-          return category.documents.length > 0 || isAdmin;
+          return documentCount > 0 || isAdmin;
         }
 
-        return category.documents.length > 0;
+        return documentCount > 0;
       }
 
       if (hideEmpty) {
-        return category.documents.length > 0;
+        return documentCount > 0;
       }
 
       return true;

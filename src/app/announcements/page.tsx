@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getAnnouncements } from "@/features/announcements/actions";
@@ -29,7 +30,9 @@ export default async function AnnouncementsPage() {
           </div>
 
           <Button asChild variant="outline" className="shrink-0">
-            <a href="/dashboard">На головну</a>
+            <Link href="/dashboard" prefetch>
+              На головну
+            </Link>
           </Button>
         </div>
 
