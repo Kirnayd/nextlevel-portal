@@ -1,11 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 
 import type { AnnouncementImage } from "@/features/announcements/actions";
-import { AnnouncementImageLightbox } from "@/features/announcements/components/announcement-image-lightbox";
 import { AnnouncementImagePlaceholder } from "@/features/announcements/components/announcement-image-placeholder";
 import { getAnnouncementImageUrl } from "@/features/announcements/constants";
+
+const AnnouncementImageLightbox = dynamic(
+  () =>
+    import("@/features/announcements/components/announcement-image-lightbox").then(
+      (module) => module.AnnouncementImageLightbox,
+    ),
+  { ssr: false },
+);
 
 type AnnouncementGalleryProps = {
   images: AnnouncementImage[];

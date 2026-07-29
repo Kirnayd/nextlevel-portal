@@ -1,8 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import type { AnnouncementWithImages } from "@/features/announcements/actions";
 import { AdminAnnouncementActions } from "@/features/announcements/components/admin-announcement-actions";
-import { AdminAnnouncementImages } from "@/features/announcements/components/admin-announcement-images";
 import { AnnouncementCoverThumbnail } from "@/features/announcements/components/announcement-cover-thumbnail";
 import { AnnouncementGallery } from "@/features/announcements/components/announcement-gallery";
 import { HiddenBadge } from "@/features/announcements/components/hidden-badge";
@@ -14,6 +15,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
+
+const AdminAnnouncementImages = dynamic(
+  () =>
+    import("@/features/announcements/components/admin-announcement-images").then(
+      (module) => module.AdminAnnouncementImages,
+    ),
+  { ssr: false, loading: () => null },
+);
 
 type AnnouncementListProps = {
   announcements: AnnouncementWithImages[];

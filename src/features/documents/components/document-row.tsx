@@ -7,7 +7,8 @@ import {
   formatUploadedAt,
   getMimeTypeLabel,
 } from "@/features/documents/lib/format";
-import { Button } from "@/shared/components/ui/button";
+import { FileOpenTrigger } from "@/shared/components/file-viewer/file-open-trigger";
+import { isPdfMimeType } from "@/shared/lib/file-types";
 
 type DocumentRowProps = {
   document: Document;
@@ -16,12 +17,13 @@ type DocumentRowProps = {
 };
 
 function isPdfDocument(mimeType: string): boolean {
-  return mimeType === "application/pdf";
+  return isPdfMimeType(mimeType);
 }
 
 export function DocumentRow({ document, categories, isAdmin }: DocumentRowProps) {
   const downloadUrl = `/api/documents/download?id=${document.id}`;
   const isPdf = isPdfDocument(document.mime_type);
+  const fileTypeLabel = getMimeTypeLabel(document.mime_type);
 
   return (
     <div className="rounded-lg border bg-card p-4">
@@ -40,12 +42,16 @@ export function DocumentRow({ document, categories, isAdmin }: DocumentRowProps)
           </div>
         </div>
 
-        <Button asChild variant={isPdf ? "default" : "outline"} className="shrink-0">
-          <a href={downloadUrl} target={isPdf ? "_blank" : undefined} rel={isPdf ? "noopener noreferrer" : undefined}>
-            {isPdf ? <ExternalLink /> : <Download />}
-            {isPdf ? "Відкрити PDF" : "Завантажити"}
-          </a>
-        </Button>
+        <FileOpenTrigger
+          downloadUrl={downloadUrl}
+          filename={document.original_filename}
+          mimeType={document.mime_type}
+          fileTypeLabel={fileTypeLabel}
+          sizeBytes={document.size_bytes}
+          label={isPdf ? "Відкрити PDF" : "Відкрити"}
+          icon={isPdf ? <ExternalLink /> : <Download />}
+          variant={isPdf ? "default" : "outline"}
+        />
       </div>
 
       {isAdmin ? (
