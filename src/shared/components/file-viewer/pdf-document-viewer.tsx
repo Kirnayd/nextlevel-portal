@@ -11,10 +11,56 @@ type PdfDocumentViewerProps = {
 
 type PageRenderState = {
   pageNumber: number;
-  width: number;
-  height: number;
-  dataUrl: string;
+  cssWidth: number;
+  cssHeight: number;
+  canvas: HTMLCanvasElement;
 };
+
+function getRenderPixelRatio(): number {
+  const devicePixelRatio = window.devicePixelRatio || 1;
+  const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+
+  if (deviceMemory !== undefined && deviceMemory < 4) {
+    return Math.min(devicePixelRatio, 2);
+  }
+
+  return Math.min(devicePixelRatio, 3);
+}
+
+function PdfPageCanvas({ page }: { page: PageRenderState }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+
+    if (!host) {
+      return;
+    }
+
+    page.canvas.style.width = "100%";
+    page.canvas.style.maxWidth = `${page.cssWidth}px`;
+    page.canvas.style.aspectRatio = `${page.cssWidth} / ${page.cssHeight}`;
+    page.canvas.style.height = "auto";
+    page.canvas.style.touchAction = "auto";
+    page.canvas.className = "block rounded-md border bg-white shadow-sm";
+
+    host.replaceChildren(page.canvas);
+
+    return () => {
+      if (host.contains(page.canvas)) {
+        host.removeChild(page.canvas);
+      }
+    };
+  }, [page]);
+
+  return (
+    <div
+      ref={hostRef}
+      className="flex w-full justify-center"
+      style={{ touchAction: "auto" }}
+    />
+  );
+}
 
 export function PdfDocumentViewer({
   fileBlob,
@@ -62,6 +108,7 @@ export function PdfDocumentViewer({
 
         const containerWidth = scrollRef.current?.clientWidth ?? window.innerWidth;
         const availableWidth = Math.max(containerWidth - 32, 280);
+        const pixelRatio = getRenderPixelRatio();
         const renderedPages: PageRenderState[] = [];
 
         for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
@@ -71,8 +118,8 @@ export function PdfDocumentViewer({
 
           const page = await pdfDocument.getPage(pageNumber);
           const baseViewport = page.getViewport({ scale: 1 });
-          const scale = availableWidth / baseViewport.width;
-          const viewport = page.getViewport({ scale });
+          const cssScale = availableWidth / baseViewport.width;
+          const cssViewport = page.getViewport({ scale: cssScale });
           const canvas = document.createElement("canvas");
           const context = canvas.getContext("2d");
 
@@ -80,12 +127,18 @@ export function PdfDocumentViewer({
             throw new Error("Canvas context unavailable");
           }
 
-          canvas.width = Math.floor(viewport.width);
-          canvas.height = Math.floor(viewport.height);
+          canvas.width = Math.floor(cssViewport.width * pixelRatio);
+          canvas.height = Math.floor(cssViewport.height * pixelRatio);
+
+          const transform =
+            pixelRatio !== 1
+              ? [pixelRatio, 0, 0, pixelRatio, 0, 0]
+              : undefined;
 
           const renderTask = page.render({
             canvasContext: context,
-            viewport,
+            viewport: cssViewport,
+            transform,
           });
 
           renderTaskRef.current = renderTask;
@@ -93,9 +146,9 @@ export function PdfDocumentViewer({
 
           renderedPages.push({
             pageNumber,
-            width: canvas.width,
-            height: canvas.height,
-            dataUrl: canvas.toDataURL("image/png"),
+            cssWidth: Math.floor(cssViewport.width),
+            cssHeight: Math.floor(cssViewport.height),
+            canvas,
           });
 
           if (!cancelled) {
@@ -196,18 +249,8 @@ export function PdfDocumentViewer({
             key={page.pageNumber}
             ref={(element) => setPageRef(page.pageNumber, element)}
             data-page-number={page.pageNumber}
-            className="flex justify-center"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={page.dataUrl}
-              alt={`Сторінка ${page.pageNumber}`}
-              width={page.width}
-              height={page.height}
-              className="h-auto max-w-full rounded-md border bg-white shadow-sm"
-              style={{ touchAction: "auto" }}
-              draggable={false}
-            />
+            <PdfPageCanvas page={page} />
           </div>
         ))}
 
