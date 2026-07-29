@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getCurrentPriceFile } from "@/features/price/actions";
+import { PriceReadTracker } from "@/features/price/components/price-read-tracker";
 import { PriceUploadForm } from "@/features/price/components/price-upload-form";
 import { PriceView } from "@/features/price/components/price-view";
 import { getSessionContext } from "@/shared/lib/auth";
@@ -40,6 +41,8 @@ export default async function PricePage() {
         </div>
 
         <PriceView priceFile={priceFile} />
+
+        {!userIsAdmin && priceFile ? <PriceReadTracker fileId={priceFile.id} /> : null}
 
         {userIsAdmin ? (
           <Card>

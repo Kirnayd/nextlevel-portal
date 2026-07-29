@@ -406,11 +406,12 @@ export async function uploadDocument(formData: FormData): Promise<ActionResult> 
   }
 
   let subcategoryId: string | null = null;
+  let subcategoryName: string | null = null;
 
   if (subcategoryInput && subcategoryInput !== "none") {
     const { data: subcategory, error: subcategoryError } = await supabase
       .from("document_subcategories")
-      .select("id, category_id")
+      .select("id, category_id, name")
       .eq("id", subcategoryInput)
       .maybeSingle();
 
@@ -426,6 +427,7 @@ export async function uploadDocument(formData: FormData): Promise<ActionResult> 
     }
 
     subcategoryId = (subcategory as { id: string }).id;
+    subcategoryName = (subcategory as { name: string }).name;
   }
 
   const storagePath = buildDocumentStoragePath(categoryId, originalFilename);
@@ -475,6 +477,7 @@ export async function uploadDocument(formData: FormData): Promise<ActionResult> 
       (savedDocument as { id: string }).id,
       title,
       (category as { name: string }).name,
+      subcategoryName,
     );
   } catch (error) {
     console.error("Document push notification failed:", error);

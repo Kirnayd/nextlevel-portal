@@ -2,10 +2,12 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import type { QuestionWithAnswer } from "@/features/questions/actions";
 import { AdminQuestionDelete } from "@/features/questions/components/admin-question-delete";
 import { QuestionStatusBadge } from "@/features/questions/components/question-status-badge";
+import { markQuestionAnswerRead } from "@/features/unread/actions";
 import {
   Card,
   CardContent,
@@ -71,7 +73,31 @@ function QuestionCard({
   isAdmin: boolean;
   onQuestionDeleted: (questionId: string) => void;
 }) {
+  const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(isAdmin && question.status !== "answered");
+  const [isAnswerVisible, setIsAnswerVisible] = useState(false);
+  const [isMarkingAnswerRead, setIsMarkingAnswerRead] = useState(false);
+
+  async function handleViewAnswer() {
+    if (isAdmin || !question.answer || isAnswerVisible) {
+      return;
+    }
+
+    setIsAnswerVisible(true);
+    setIsMarkingAnswerRead(true);
+
+    try {
+      const result = await markQuestionAnswerRead(question.id);
+
+      if (result.success) {
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Mark question answer read error:", error);
+    } finally {
+      setIsMarkingAnswerRead(false);
+    }
+  }
 
   return (
     <Card>
@@ -104,17 +130,30 @@ function QuestionCard({
         <p className="whitespace-pre-wrap text-sm leading-relaxed">{question.message}</p>
 
         {question.answer ? (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-              Відповідь адміністратора
-            </p>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
-              {question.answer.message}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {formatCreatedAt(question.answer.created_at)}
-            </p>
-          </div>
+          isAdmin || isAnswerVisible ? (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+              <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                Відповідь адміністратора
+              </p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+                {question.answer.message}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {formatCreatedAt(question.answer.created_at)}
+              </p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={isMarkingAnswerRead}
+              onClick={() => void handleViewAnswer()}
+              className={cn(
+                "text-sm font-medium text-primary underline-offset-4 hover:underline",
+              )}
+            >
+              {isMarkingAnswerRead ? "Відкриття…" : "Переглянути відповідь"}
+            </button>
+          )
         ) : null}
 
         {isAdmin ? (

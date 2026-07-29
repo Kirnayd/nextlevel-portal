@@ -195,6 +195,10 @@ export async function createAnnouncement(formData: FormData): Promise<ActionResu
 
   revalidatePath("/announcements");
 
+  if (insertPayload.is_published) {
+    revalidatePath("/dashboard");
+  }
+
   let pushWarning: string | undefined;
 
   if (insertPayload.is_published) {
@@ -270,6 +274,10 @@ export async function updateAnnouncement(
   let pushWarning: string | undefined;
   const wasPublished = (existingAnnouncement as { is_published: boolean }).is_published;
   const isNowPublished = updatePayload.is_published ?? false;
+
+  if (!wasPublished && isNowPublished) {
+    revalidatePath("/dashboard");
+  }
 
   if (!wasPublished && isNowPublished) {
     pushWarning = await runAnnouncementPublishedPush(
@@ -414,6 +422,10 @@ export async function togglePublished(announcementId: string): Promise<ActionRes
   revalidatePath("/announcements");
 
   let pushWarning: string | undefined;
+
+  if (!current.is_published) {
+    revalidatePath("/dashboard");
+  }
 
   if (!current.is_published) {
     pushWarning = await runAnnouncementPublishedPush(announcementId, current.title);

@@ -337,6 +337,7 @@ export async function submitAnswer(
   try {
     pushWarning = await notifyQuestionAnswered(
       (savedAnswer as { id: string }).id,
+      questionId,
       (question as { user_id: string; subject: string }).user_id,
       (question as { user_id: string; subject: string }).subject,
     );

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/infrastructure/supabase/server";
+import { createAdminClient } from "@/infrastructure/supabase/admin";
 import { notifyPriceUpdated } from "@/infrastructure/push/triggers";
 import {
   PRICE_ALLOWED_MIME_TYPES,
@@ -136,6 +137,14 @@ export async function uploadPriceFile(formData: FormData): Promise<UploadPriceRe
   }
 
   revalidatePath("/price");
+  revalidatePath("/dashboard");
+
+  const admin = createAdminClient();
+  const { error: clearReadsError } = await admin.from("price_reads").delete().not("id", "is", null);
+
+  if (clearReadsError) {
+    console.error("Failed to clear price reads after upload:", clearReadsError.message);
+  }
 
   let pushWarning: string | undefined;
 

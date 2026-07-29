@@ -61,6 +61,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      announcement_reads: {
+        Row: {
+          id: string;
+          user_id: string;
+          announcement_id: string;
+          read_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          announcement_id: string;
+          read_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          announcement_id?: string;
+          read_at?: string;
+        };
+        Relationships: [];
+      };
       announcement_images: {
         Row: {
           id: string;
@@ -208,6 +229,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      price_reads: {
+        Row: {
+          id: string;
+          user_id: string;
+          file_id: string;
+          read_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          file_id: string;
+          read_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          file_id?: string;
+          read_at?: string;
+        };
+        Relationships: [];
+      };
       notification_events: {
         Row: {
           id: string;
@@ -265,6 +307,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: "announcement" | "price" | "document" | "question_answer";
+          title: string;
+          body: string | null;
+          url: string;
+          entity_id: string | null;
+          is_read: boolean;
+          created_at: string;
+          read_at: string | null;
+          event_key: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: "announcement" | "price" | "document" | "question_answer";
+          title: string;
+          body?: string | null;
+          url: string;
+          entity_id?: string | null;
+          is_read?: boolean;
+          created_at?: string;
+          read_at?: string | null;
+          event_key?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: "announcement" | "price" | "document" | "question_answer";
+          title?: string;
+          body?: string | null;
+          url?: string;
+          entity_id?: string | null;
+          is_read?: boolean;
+          created_at?: string;
+          read_at?: string | null;
+          event_key?: string | null;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
@@ -286,6 +370,27 @@ export type Database = {
           full_name?: string | null;
           role?: Database["public"]["Enums"]["user_role"];
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      question_answer_reads: {
+        Row: {
+          id: string;
+          user_id: string;
+          question_id: string;
+          read_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          question_id: string;
+          read_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          question_id?: string;
+          read_at?: string;
         };
         Relationships: [];
       };
@@ -321,7 +426,18 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      count_unread_announcements: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      count_unread_price: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      count_unread_question_answers: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
     };
     Enums: {
       file_category: "price";
