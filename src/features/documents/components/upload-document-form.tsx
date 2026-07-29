@@ -65,7 +65,7 @@ export function UploadDocumentForm({ categories, onSuccess }: UploadDocumentForm
       return;
     }
 
-    const form = formRef.current ?? event.currentTarget;
+    const form = event.currentTarget;
     const selectedFile = fileInputRef.current?.files?.[0];
 
     if (!selectedFile) {

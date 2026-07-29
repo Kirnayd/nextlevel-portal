@@ -19,11 +19,13 @@ export function CreateSubcategoryDialog({
   onClose,
 }: CreateSubcategoryDialogProps) {
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setErrorMessage("");
+      setSuccessMessage("");
     }
   }, [open]);
 
@@ -48,11 +50,14 @@ export function CreateSubcategoryDialog({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const form = event.currentTarget;
+
     setErrorMessage("");
+    setSuccessMessage("");
     setIsSubmitting(true);
 
     try {
-      const formData = new FormData(event.currentTarget);
+      const formData = new FormData(form);
       const result = await createSubcategory(categoryId, formData);
 
       if (!result.success) {
@@ -60,7 +65,8 @@ export function CreateSubcategoryDialog({
         return;
       }
 
-      event.currentTarget.reset();
+      form.reset();
+      setSuccessMessage("Підкатегорію створено.");
       onClose();
     } catch (error) {
       const message =
@@ -115,6 +121,15 @@ export function CreateSubcategoryDialog({
               className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
             >
               {errorMessage}
+            </div>
+          ) : null}
+
+          {successMessage ? (
+            <div
+              role="status"
+              className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300"
+            >
+              {successMessage}
             </div>
           ) : null}
 

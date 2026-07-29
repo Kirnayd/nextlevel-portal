@@ -28,12 +28,14 @@ export function AdminSubcategoryActions({
   async function handleRename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const form = event.currentTarget;
+
     setErrorMessage("");
     setSuccessMessage("");
     setIsRenaming(true);
 
     try {
-      const formData = new FormData(event.currentTarget);
+      const formData = new FormData(form);
       const result = await renameSubcategory(subcategory.id, formData);
 
       if (!result.success) {
