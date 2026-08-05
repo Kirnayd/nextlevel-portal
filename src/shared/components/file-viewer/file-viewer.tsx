@@ -271,6 +271,70 @@ export function FileViewer({
     handleContentError(message);
   }, [handleContentError]);
 
+  const handleExcelStatusChange = useCallback(
+    (status: {
+      phase: "loading" | "parsing" | "ready" | "too-large" | "error";
+      message?: string;
+    }) => {
+      const nextMessage = status.message ?? "";
+      setContentStatusMessage((previous) => (previous === nextMessage ? previous : nextMessage));
+
+      if (status.phase === "too-large") {
+        setExcelTooLarge(true);
+      }
+
+      if (status.phase === "error") {
+        handleContentError("Не вдалося відкрити документ");
+      }
+    },
+    [handleContentError],
+  );
+
+  const handleExcelLoadError = useCallback(() => {
+    handleContentError("Не вдалося відкрити документ");
+  }, [handleContentError]);
+
+  const handleWordStatusChange = useCallback(
+    (status: { phase: "loading" | "ready" | "error"; message?: string }) => {
+      const nextMessage = status.message ?? "";
+      setContentStatusMessage((previous) => (previous === nextMessage ? previous : nextMessage));
+    },
+    [],
+  );
+
+  const handleWordLoadError = useCallback(() => {
+    handleContentError("Не вдалося відкрити документ");
+  }, [handleContentError]);
+
+  const handlePresentationStatusChange = useCallback(
+    (status: {
+      phase: "loading" | "ready" | "error" | "fallback";
+      slideIndicator?: string;
+      message?: string;
+    }) => {
+      setSlideIndicator((previous) => {
+        const next = status.slideIndicator ?? null;
+        return previous === next ? previous : next;
+      });
+
+      const nextMessage = status.message ?? "";
+      setContentStatusMessage((previous) => (previous === nextMessage ? previous : nextMessage));
+
+      if (status.phase === "fallback") {
+        setShowPresentationFallback(true);
+      }
+    },
+    [],
+  );
+
+  const handlePresentationLoadError = useCallback(() => {
+    setShowPresentationFallback(true);
+  }, []);
+
+  const handlePresentationFallback = useCallback(() => {
+    setShowPresentationFallback(true);
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
@@ -326,6 +390,7 @@ export function FileViewer({
 
     let cancelled = false;
     const controller = new AbortController();
+    const requestUrl = downloadUrl;
 
     async function loadFile() {
       setIsLoading(true);
@@ -344,7 +409,7 @@ export function FileViewer({
       setExcelTooLarge(false);
 
       try {
-        const blob = await fetchAuthenticatedFileBlob(downloadUrl, controller.signal);
+        const blob = await fetchAuthenticatedFileBlob(requestUrl, controller.signal);
         fileBlobRef.current = blob;
 
         if (!cancelled) {
@@ -370,7 +435,6 @@ export function FileViewer({
     return () => {
       cancelled = true;
       controller.abort();
-      fileBlobRef.current = null;
     };
   }, [open, downloadUrl, previewMode, showPresentationFallback]);
 
@@ -526,16 +590,8 @@ export function FileViewer({
               fileBlob={fileBlob}
               searchPlaceholder={searchPlaceholder}
               loadingLabel={loadingLabel}
-              onStatusChange={(status) => {
-                setContentStatusMessage(status.message ?? "");
-                if (status.phase === "too-large") {
-                  setExcelTooLarge(true);
-                }
-                if (status.phase === "error") {
-                  handleContentError("Не вдалося відкрити документ");
-                }
-              }}
-              onLoadError={() => handleContentError("Не вдалося відкрити документ")}
+              onStatusChange={handleExcelStatusChange}
+              onLoadError={handleExcelLoadError}
             />
           )
         ) : null}
@@ -543,25 +599,17 @@ export function FileViewer({
         {!isLoading && !hasError && !showFallback && previewMode === "docx" && fileBlob ? (
           <WordDocumentViewer
             fileBlob={fileBlob}
-            onStatusChange={(status) => {
-              setContentStatusMessage(status.message ?? "");
-            }}
-            onLoadError={() => handleContentError("Не вдалося відкрити документ")}
+            onStatusChange={handleWordStatusChange}
+            onLoadError={handleWordLoadError}
           />
         ) : null}
 
         {!isLoading && !hasError && !showFallback && previewMode === "pptx" && fileBlob ? (
           <PresentationViewer
             fileBlob={fileBlob}
-            onStatusChange={(status) => {
-              setSlideIndicator(status.slideIndicator ?? null);
-              setContentStatusMessage(status.message ?? "");
-              if (status.phase === "fallback") {
-                setShowPresentationFallback(true);
-              }
-            }}
-            onLoadError={() => setShowPresentationFallback(true)}
-            onFallback={() => setShowPresentationFallback(true)}
+            onStatusChange={handlePresentationStatusChange}
+            onLoadError={handlePresentationLoadError}
+            onFallback={handlePresentationFallback}
           />
         ) : null}
 

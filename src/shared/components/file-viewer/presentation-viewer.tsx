@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   parsePptxPresentation,
@@ -29,6 +29,14 @@ export function PresentationViewer({
   const [phase, setPhase] = useState<"loading" | "ready" | "error" | "fallback">("loading");
   const [presentation, setPresentation] = useState<PresentationData | null>(null);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const presentationRef = useRef<PresentationData | null>(null);
+  const onStatusChangeRef = useRef(onStatusChange);
+  const onLoadErrorRef = useRef(onLoadError);
+  const onFallbackRef = useRef(onFallback);
+
+  onStatusChangeRef.current = onStatusChange;
+  onLoadErrorRef.current = onLoadError;
+  onFallbackRef.current = onFallback;
 
   const activeSlide = presentation?.slides[activeSlideIndex] ?? null;
   const slideIndicator =
@@ -37,8 +45,8 @@ export function PresentationViewer({
       : undefined;
 
   useEffect(() => {
-    onStatusChange?.({ phase, slideIndicator });
-  }, [onStatusChange, phase, slideIndicator]);
+    onStatusChangeRef.current?.({ phase, slideIndicator });
+  }, [phase, slideIndicator]);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,10 +66,11 @@ export function PresentationViewer({
         if (parsed.slides.length === 0) {
           revokePresentationUrls(parsed);
           setPhase("fallback");
-          onFallback?.();
+          onFallbackRef.current?.();
           return;
         }
 
+        presentationRef.current = parsed;
         setPresentation(parsed);
         setActiveSlideIndex(0);
         setPhase("ready");
@@ -72,9 +81,9 @@ export function PresentationViewer({
 
         const message = error instanceof Error ? error.message : "Unknown parse error";
         console.error("PPTX parse error:", message);
-        onLoadError?.(message);
+        onLoadErrorRef.current?.(message);
         setPhase("fallback");
-        onFallback?.();
+        onFallbackRef.current?.();
       }
     }
 
@@ -82,16 +91,14 @@ export function PresentationViewer({
 
     return () => {
       cancelled = true;
-      setPresentation((current) => {
-        revokePresentationUrls(current);
-        return null;
-      });
+      revokePresentationUrls(presentationRef.current);
+      presentationRef.current = null;
     };
-  }, [fileBlob, onFallback, onLoadError]);
+  }, [fileBlob]);
 
   if (phase === "loading") {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
         Завантаження презентації...
       </div>
     );

@@ -196,7 +196,7 @@ export async function markPriceRead(fileId: string): Promise<MarkReadResult> {
     return { success: false, error: "Не вдалося позначити прайс переглянутим." };
   }
 
-  revalidateEmployeeBadgePaths(["/price", "/dashboard"]);
+  revalidateEmployeeBadgePaths(["/dashboard"]);
 
   return { success: true };
 }

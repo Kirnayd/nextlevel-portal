@@ -25,14 +25,16 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { cn } from "@/shared/lib/utils";
 
+export type ExcelViewerStatus = {
+  phase: "loading" | "parsing" | "ready" | "too-large" | "error";
+  message?: string;
+};
+
 export type ExcelSpreadsheetViewerProps = {
   fileBlob: Blob;
   searchPlaceholder?: string;
   loadingLabel?: string;
-  onStatusChange?: (status: {
-    phase: "loading" | "parsing" | "ready" | "too-large" | "error";
-    message?: string;
-  }) => void;
+  onStatusChange?: (status: ExcelViewerStatus) => void;
   onLoadError?: (message: string) => void;
 };
 
@@ -82,12 +84,15 @@ function VirtualizedWorksheetTable({
       return;
     }
 
-    const observer = new ResizeObserver(() => {
-      setViewportHeight(element.clientHeight);
-    });
+    const updateViewportHeight = () => {
+      const nextHeight = Math.round(element.clientHeight);
 
+      setViewportHeight((previous) => (previous === nextHeight ? previous : nextHeight));
+    };
+
+    const observer = new ResizeObserver(updateViewportHeight);
     observer.observe(element);
-    setViewportHeight(element.clientHeight);
+    updateViewportHeight();
 
     return () => observer.disconnect();
   }, []);
@@ -143,7 +148,10 @@ function VirtualizedWorksheetTable({
     <div
       ref={scrollRef}
       className="min-h-0 flex-1 overflow-auto rounded-md border bg-background"
-      onScroll={(event: UIEvent<HTMLDivElement>) => setScrollTop(event.currentTarget.scrollTop)}
+      onScroll={(event: UIEvent<HTMLDivElement>) => {
+        const nextScrollTop = event.currentTarget.scrollTop;
+        setScrollTop((previous) => (previous === nextScrollTop ? previous : nextScrollTop));
+      }}
     >
       <table className="min-w-max border-collapse">
         <thead>
@@ -199,6 +207,12 @@ export function ExcelSpreadsheetViewer({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
 
+  const onStatusChangeRef = useRef(onStatusChange);
+  const onLoadErrorRef = useRef(onLoadError);
+
+  onStatusChangeRef.current = onStatusChange;
+  onLoadErrorRef.current = onLoadError;
+
   const activeSheet = workbook?.sheets[activeSheetIndex] ?? null;
 
   const matches = useMemo(() => {
@@ -210,8 +224,11 @@ export function ExcelSpreadsheetViewer({
   }, [activeSheet, searchQuery]);
 
   useEffect(() => {
-    onStatusChange?.({ phase, message: parseProgress || undefined });
-  }, [onStatusChange, phase, parseProgress]);
+    onStatusChangeRef.current?.({
+      phase,
+      message: parseProgress || undefined,
+    });
+  }, [phase, parseProgress]);
 
   useEffect(() => {
     let cancelled = false;
@@ -219,9 +236,18 @@ export function ExcelSpreadsheetViewer({
     async function parseWorkbook() {
       setPhase("parsing");
       setParseProgress("");
+      setWorkbook(null);
+      setActiveSheetIndex(0);
+      setSearchQuery("");
+      setActiveMatchIndex(0);
 
       try {
         const buffer = await fileBlob.arrayBuffer();
+
+        if (cancelled) {
+          return;
+        }
+
         const parsedWorkbook = await parseExcelWorkbook(buffer, (progress) => {
           if (cancelled) {
             return;
@@ -243,6 +269,7 @@ export function ExcelSpreadsheetViewer({
 
         setWorkbook(parsedWorkbook);
         setActiveSheetIndex(parsedWorkbook.defaultSheetIndex);
+        setParseProgress("");
         setPhase("ready");
       } catch (error) {
         if (cancelled) {
@@ -251,7 +278,7 @@ export function ExcelSpreadsheetViewer({
 
         const message = error instanceof Error ? error.message : "Unknown parse error";
         console.error("Excel parse error:", message);
-        onLoadError?.(message);
+        onLoadErrorRef.current?.(message);
         setPhase("error");
       }
     }
@@ -260,11 +287,8 @@ export function ExcelSpreadsheetViewer({
 
     return () => {
       cancelled = true;
-      setWorkbook(null);
-      setSearchQuery("");
-      setActiveMatchIndex(0);
     };
-  }, [fileBlob, onLoadError]);
+  }, [fileBlob]);
 
   useEffect(() => {
     setActiveMatchIndex(0);
@@ -272,7 +296,7 @@ export function ExcelSpreadsheetViewer({
 
   if (phase === "loading" || phase === "parsing") {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
         {parseProgress || loadingLabel}
       </div>
     );
@@ -280,7 +304,7 @@ export function ExcelSpreadsheetViewer({
 
   if (phase === "too-large") {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground">
+      <div className="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm text-muted-foreground">
         Файл завеликий для перегляду в браузері.
       </div>
     );

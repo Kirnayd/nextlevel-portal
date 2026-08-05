@@ -15,10 +15,15 @@ export function WordDocumentViewer({
 }: WordDocumentViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
+  const onStatusChangeRef = useRef(onStatusChange);
+  const onLoadErrorRef = useRef(onLoadError);
+
+  onStatusChangeRef.current = onStatusChange;
+  onLoadErrorRef.current = onLoadError;
 
   useEffect(() => {
-    onStatusChange?.({ phase });
-  }, [onStatusChange, phase]);
+    onStatusChangeRef.current?.({ phase });
+  }, [phase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +61,7 @@ export function WordDocumentViewer({
 
         const message = error instanceof Error ? error.message : "Unknown render error";
         console.error("DOCX render error:", message);
-        onLoadError?.(message);
+        onLoadErrorRef.current?.(message);
         setPhase("error");
       }
     }
@@ -67,7 +72,7 @@ export function WordDocumentViewer({
       cancelled = true;
       container?.replaceChildren();
     };
-  }, [fileBlob, onLoadError]);
+  }, [fileBlob]);
 
   if (phase === "loading") {
     return (
