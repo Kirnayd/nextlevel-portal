@@ -13,6 +13,17 @@ function documentMatchesQuery(
   );
 }
 
+/**
+ * Derive visible categories for display without mutating the source array.
+ *
+ * Admin:
+ * - empty search → full structure (every category and subcategory, including empty)
+ * - active search → matches only; empty named matches still kept for admin
+ *
+ * Employee:
+ * - hideEmpty OFF → full structure
+ * - hideEmpty ON → hide categories/subcategories with zero documents
+ */
 export function filterCategoriesForDisplay(
   categories: DocumentCategoryWithDocuments[],
   searchQuery: string,
@@ -20,6 +31,16 @@ export function filterCategoriesForDisplay(
   isAdmin: boolean,
 ): DocumentCategoryWithDocuments[] {
   const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  // Admin with no search: never hide empty categories/subcategories.
+  if (isAdmin && !normalizedQuery) {
+    return categories;
+  }
+
+  // Employee with hide-empty off and no search: show full structure.
+  if (!isAdmin && !hideEmpty && !normalizedQuery) {
+    return categories;
+  }
 
   return categories
     .map((category) => {
@@ -52,7 +73,8 @@ export function filterCategoriesForDisplay(
         })
         .filter((subcategory) => {
           if (!normalizedQuery) {
-            if (!isAdmin && subcategory.documents.length === 0) {
+            // Employee hide-empty ON: drop empty subcategories.
+            if (!isAdmin && hideEmpty && subcategory.documents.length === 0) {
               return false;
             }
 
@@ -64,7 +86,8 @@ export function filterCategoriesForDisplay(
             .includes(normalizedQuery);
 
           if (categoryNameMatches || subcategoryNameMatches) {
-            return subcategory.documents.length > 0 || isAdmin;
+            // Keep empty named matches for admin; employees need docs or name alone is enough for structure.
+            return subcategory.documents.length > 0 || isAdmin || subcategoryNameMatches;
           }
 
           return subcategory.documents.length > 0;
@@ -108,7 +131,8 @@ export function filterCategoriesForDisplay(
         return documentCount > 0;
       }
 
-      if (hideEmpty && !isAdmin) {
+      // Employee hide-empty ON: hide empty categories.
+      if (!isAdmin && hideEmpty) {
         return documentCount > 0;
       }
 

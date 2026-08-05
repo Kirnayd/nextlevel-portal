@@ -41,62 +41,67 @@ type DocumentsViewProps = {
 export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 250);
-  const [orderedCategories, setOrderedCategories] = useState(categories);
-  const { hideEmpty, setHideEmpty, isReady: preferencesReady } =
-    useHideEmptyCategoriesPreference(true);
+  // Source of truth — never overwritten by search/hide-empty filtering.
+  const [allCategories, setAllCategories] = useState(categories);
+
+  const employeeHideEmptyPreference = useHideEmptyCategoriesPreference(true);
+  const hideEmpty = isAdmin ? false : employeeHideEmptyPreference.hideEmpty;
+  const preferencesReady = isAdmin ? true : employeeHideEmptyPreference.isReady;
 
   useEffect(() => {
-    setOrderedCategories(categories);
+    setAllCategories(categories);
   }, [categories]);
 
-  const visibleCategories = useMemo(
-    () =>
-      filterCategoriesForDisplay(
-        orderedCategories,
-        debouncedSearchQuery,
-        isAdmin ? false : hideEmpty,
-        isAdmin,
-      ),
-    [orderedCategories, debouncedSearchQuery, hideEmpty, isAdmin],
-  );
+  const visibleCategories = useMemo(() => {
+    if (isAdmin && debouncedSearchQuery.trim().length === 0) {
+      return allCategories;
+    }
+
+    return filterCategoriesForDisplay(
+      allCategories,
+      debouncedSearchQuery,
+      hideEmpty,
+      isAdmin,
+    );
+  }, [allCategories, debouncedSearchQuery, hideEmpty, isAdmin]);
 
   const documentCountByCategoryId = useMemo(
     () =>
-      new Map(orderedCategories.map((category) => [category.id, getCategoryDocumentCount(category)])),
-    [orderedCategories],
+      new Map(allCategories.map((category) => [category.id, getCategoryDocumentCount(category)])),
+    [allCategories],
   );
 
   const subcategoryCountByCategoryId = useMemo(
-    () => new Map(orderedCategories.map((category) => [category.id, category.subcategories.length])),
-    [orderedCategories],
+    () => new Map(allCategories.map((category) => [category.id, category.subcategories.length])),
+    [allCategories],
   );
 
   const documentCountBySubcategoryId = useMemo(() => {
     const counts = new Map<string, number>();
 
-    for (const category of orderedCategories) {
+    for (const category of allCategories) {
       for (const subcategory of category.subcategories) {
         counts.set(subcategory.id, subcategory.documents.length);
       }
     }
 
     return counts;
-  }, [orderedCategories]);
+  }, [allCategories]);
 
   const isDragEnabled = isAdmin && debouncedSearchQuery.trim().length === 0;
   const hasSearchQuery = debouncedSearchQuery.trim().length > 0;
-  const hasCategories = orderedCategories.length > 0;
+  const hasCategories = allCategories.length > 0;
 
   return (
     <div className="space-y-6">
-      {isAdmin ? <AdminToolbar categories={orderedCategories} /> : null}
+      {isAdmin ? <AdminToolbar categories={allCategories} /> : null}
 
       {hasCategories ? (
         <DocumentsControls
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
           hideEmpty={hideEmpty}
-          onHideEmptyChange={setHideEmpty}
+          onHideEmptyChange={employeeHideEmptyPreference.setHideEmpty}
           preferencesReady={preferencesReady}
           showHideEmptyToggle={!isAdmin}
         />
@@ -131,14 +136,14 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
       ) : isDragEnabled ? (
         <SortableCategoryList
           visibleCategories={visibleCategories}
-          orderedCategories={orderedCategories}
-          allCategories={orderedCategories}
-          onOrderChange={setOrderedCategories}
+          orderedCategories={allCategories}
+          allCategories={allCategories}
+          onOrderChange={setAllCategories}
         />
       ) : (
         <CategoryList
           visibleCategories={visibleCategories}
-          allCategories={orderedCategories}
+          allCategories={allCategories}
           isAdmin={isAdmin}
           documentCountByCategoryId={documentCountByCategoryId}
           subcategoryCountByCategoryId={subcategoryCountByCategoryId}

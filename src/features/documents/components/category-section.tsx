@@ -61,6 +61,9 @@ export function CategorySection({
   const hasVisibleContent =
     category.subcategories.length > 0 || category.uncategorizedDocuments.length > 0;
 
+  // Admin must still see empty categories (actions + create subcategory) even with no children yet.
+  const showEmptyCategoryMessage = !hasVisibleContent;
+
   const uncategorizedDocumentCount = useMemo(() => {
     const fullCategory = allCategories.find((item) => item.id === category.id);
 
@@ -129,7 +132,7 @@ export function CategorySection({
             </div>
           ) : null}
 
-          {!hasVisibleContent ? (
+          {showEmptyCategoryMessage ? (
             <p className="text-sm text-muted-foreground">
               {totalDocumentCount === 0
                 ? "У цій категорії ще немає документів."

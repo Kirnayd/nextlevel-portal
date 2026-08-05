@@ -115,6 +115,8 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
 
   const supabase = await createClient();
 
+  // Always load the complete category + subcategory structure, then attach documents.
+  // Do not filter by document existence — empty categories/subcategories must remain.
   const [
     { data: categories, error: categoriesError },
     { data: subcategories, error: subcategoriesError },
