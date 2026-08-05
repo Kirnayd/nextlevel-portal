@@ -58,7 +58,7 @@ export function EmployeeDashboardNav({ initialCounts }: EmployeeDashboardNavProp
         Запитання
         <NavCountBadge
           count={counts.questions}
-          ariaLabel={`Непрочитаних відповідей: ${counts.questions}`}
+          ariaLabel={`Непрочитаних повідомлень: ${counts.questions}`}
         />
       </Link>
     </>

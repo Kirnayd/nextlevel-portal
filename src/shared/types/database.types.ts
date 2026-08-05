@@ -28,6 +28,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      question_messages: {
+        Row: {
+          id: string;
+          question_id: string;
+          sender_id: string;
+          message: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          question_id: string;
+          sender_id: string;
+          message: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          question_id?: string;
+          sender_id?: string;
+          message?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      question_chat_reads: {
+        Row: {
+          question_id: string;
+          user_id: string;
+          last_read_at: string;
+        };
+        Insert: {
+          question_id: string;
+          user_id: string;
+          last_read_at?: string;
+        };
+        Update: {
+          question_id?: string;
+          user_id?: string;
+          last_read_at?: string;
+        };
+        Relationships: [];
+      };
       announcements: {
         Row: {
           id: string;
@@ -311,7 +353,7 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          type: "announcement" | "price" | "document" | "question_answer";
+          type: "announcement" | "price" | "document" | "question_answer" | "question_message";
           title: string;
           body: string | null;
           url: string;
@@ -324,7 +366,7 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
-          type: "announcement" | "price" | "document" | "question_answer";
+          type: "announcement" | "price" | "document" | "question_answer" | "question_message";
           title: string;
           body?: string | null;
           url: string;
@@ -337,7 +379,7 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
-          type?: "announcement" | "price" | "document" | "question_answer";
+          type?: "announcement" | "price" | "document" | "question_answer" | "question_message";
           title?: string;
           body?: string | null;
           url?: string;
@@ -402,6 +444,9 @@ export type Database = {
           message: string;
           status: Database["public"]["Enums"]["question_status"];
           created_at: string;
+          last_message_at: string;
+          last_message_by: string | null;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -410,6 +455,9 @@ export type Database = {
           message: string;
           status?: Database["public"]["Enums"]["question_status"];
           created_at?: string;
+          last_message_at?: string;
+          last_message_by?: string | null;
+          updated_at?: string;
         };
         Update: {
           id?: string;
@@ -418,6 +466,9 @@ export type Database = {
           message?: string;
           status?: Database["public"]["Enums"]["question_status"];
           created_at?: string;
+          last_message_at?: string;
+          last_message_by?: string | null;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -435,6 +486,10 @@ export type Database = {
         Returns: number;
       };
       count_unread_question_answers: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
+      count_unread_question_messages_for_admin: {
         Args: Record<PropertyKey, never>;
         Returns: number;
       };

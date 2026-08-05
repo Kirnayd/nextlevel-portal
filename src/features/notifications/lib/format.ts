@@ -9,6 +9,7 @@ export function getNotificationIcon(type: UserNotificationType): string {
     case "document":
       return "📄";
     case "question_answer":
+    case "question_message":
       return "💬";
     default:
       return "🔔";

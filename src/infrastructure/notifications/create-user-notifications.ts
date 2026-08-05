@@ -8,7 +8,12 @@ import { getAuthenticatedUser } from "@/shared/lib/auth";
 
 const INSERT_BATCH_SIZE = 100;
 
-export type UserNotificationType = "announcement" | "price" | "document" | "question_answer";
+export type UserNotificationType =
+  | "announcement"
+  | "price"
+  | "document"
+  | "question_answer"
+  | "question_message";
 
 export type UserNotificationPayload = {
   type: UserNotificationType;
@@ -74,6 +79,32 @@ async function getActiveEmployeeIds(): Promise<string[]> {
   return activeIds;
 }
 
+async function getActiveAdminIds(): Promise<string[]> {
+  const admin = createAdminClient();
+
+  const { data: profiles, error } = await admin.from("profiles").select("id").eq("role", "admin");
+
+  if (error) {
+    console.error("Failed to load admin profiles for notifications:", error.message);
+    return [];
+  }
+
+  const adminIds = (profiles ?? []).map((profile) => (profile as { id: string }).id);
+  const activeIds: string[] = [];
+
+  for (const userId of adminIds) {
+    const { data, error: userError } = await admin.auth.admin.getUserById(userId);
+
+    if (userError || !data.user || isAuthUserBlocked(data.user)) {
+      continue;
+    }
+
+    activeIds.push(userId);
+  }
+
+  return activeIds;
+}
+
 function buildInsertRow(userId: string, payload: UserNotificationPayload) {
   return {
     user_id: userId,
@@ -126,6 +157,64 @@ export async function createNotificationsForEmployees(payload: UserNotificationP
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Failed to create employee notifications:", message);
+  }
+}
+
+export async function createNotificationsForAdmins(
+  payload: UserNotificationPayload,
+  options?: { excludeUserId?: string },
+): Promise<void> {
+  if (!isInternalUrl(payload.url)) {
+    console.error("Skipped admin notifications: invalid internal url");
+    return;
+  }
+
+  try {
+    const adminIds = (await getActiveAdminIds()).filter(
+      (userId) => userId !== options?.excludeUserId,
+    );
+
+    if (adminIds.length === 0) {
+      return;
+    }
+
+    const rows = adminIds.map((userId) => buildInsertRow(userId, payload));
+    await insertNotificationBatch(rows);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Failed to create admin notifications:", message);
+  }
+}
+
+export async function createNotificationsForAdminsWithPerUserEventKeys(
+  base: Omit<UserNotificationPayload, "event_key">,
+  buildEventKey: (adminId: string) => string,
+  options?: { excludeUserId?: string },
+): Promise<void> {
+  if (!isInternalUrl(base.url)) {
+    console.error("Skipped admin notifications: invalid internal url");
+    return;
+  }
+
+  try {
+    const adminIds = (await getActiveAdminIds()).filter(
+      (userId) => userId !== options?.excludeUserId,
+    );
+
+    if (adminIds.length === 0) {
+      return;
+    }
+
+    const rows = adminIds.map((userId) =>
+      buildInsertRow(userId, {
+        ...base,
+        event_key: buildEventKey(userId),
+      }),
+    );
+    await insertNotificationBatch(rows);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Failed to create per-admin notifications:", message);
   }
 }
 

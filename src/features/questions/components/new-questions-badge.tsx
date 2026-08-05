@@ -5,5 +5,7 @@ type NewQuestionsBadgeProps = {
 };
 
 export function NewQuestionsBadge({ count }: NewQuestionsBadgeProps) {
-  return <NavCountBadge count={count} ariaLabel={`Нових запитань: ${count}`} />;
+  return (
+    <NavCountBadge count={count} ariaLabel={`Непрочитаних повідомлень: ${count}`} />
+  );
 }

@@ -51,7 +51,12 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
 
   const visibleCategories = useMemo(
     () =>
-      filterCategoriesForDisplay(orderedCategories, debouncedSearchQuery, hideEmpty, isAdmin),
+      filterCategoriesForDisplay(
+        orderedCategories,
+        debouncedSearchQuery,
+        isAdmin ? false : hideEmpty,
+        isAdmin,
+      ),
     [orderedCategories, debouncedSearchQuery, hideEmpty, isAdmin],
   );
 
@@ -93,6 +98,7 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
           hideEmpty={hideEmpty}
           onHideEmptyChange={setHideEmpty}
           preferencesReady={preferencesReady}
+          showHideEmptyToggle={!isAdmin}
         />
       ) : null}
 
@@ -116,7 +122,9 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
             <CardDescription>
               {hasSearchQuery
                 ? "Спробуйте інший запит або очистіть поле пошуку."
-                : "Усі категорії порожні. Вимкніть «Приховати порожні категорії», щоб їх побачити."}
+                : isAdmin
+                  ? "Немає категорій для відображення."
+                  : "Усі категорії порожні. Вимкніть «Приховати порожні категорії», щоб їх побачити."}
             </CardDescription>
           </CardHeader>
         </Card>

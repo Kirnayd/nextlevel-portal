@@ -13,7 +13,7 @@ import {
 import {
   markAnnouncementRead,
   markPriceRead,
-  markQuestionAnswerRead,
+  markQuestionChatRead,
 } from "@/features/unread/actions";
 import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
 
@@ -106,16 +106,21 @@ export async function openNotification(
   const user = await getAuthenticatedUser();
   const userIsAdmin = user ? await isAdmin(user.id) : true;
 
-  if (!userIsAdmin && notification.entity_id) {
+  if (notification.entity_id) {
     switch (notification.type) {
       case "announcement":
-        await markAnnouncementRead(notification.entity_id);
+        if (!userIsAdmin) {
+          await markAnnouncementRead(notification.entity_id);
+        }
         break;
       case "price":
-        await markPriceRead(notification.entity_id);
+        if (!userIsAdmin) {
+          await markPriceRead(notification.entity_id);
+        }
         break;
       case "question_answer":
-        await markQuestionAnswerRead(notification.entity_id);
+      case "question_message":
+        await markQuestionChatRead(notification.entity_id);
         break;
       default:
         break;

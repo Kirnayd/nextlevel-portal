@@ -114,48 +114,67 @@ export async function markAnnouncementRead(announcementId: string): Promise<Mark
   return { success: true };
 }
 
-export async function markQuestionAnswerRead(questionId: string): Promise<MarkReadResult> {
-  const employee = await requireEmployeeUser();
+export async function markQuestionChatRead(questionId: string): Promise<MarkReadResult> {
+  const user = await getAuthenticatedUser();
 
-  if (!employee) {
+  if (!user) {
     return { success: false, error: "Недоступно." };
   }
 
   if (!questionId) {
-    return { success: false, error: "Запитання не знайдено." };
+    return { success: false, error: "Чат не знайдено." };
   }
 
   const supabase = await createClient();
+  const userIsAdmin = await isAdmin(user.id);
 
   const { data: question, error: questionError } = await supabase
     .from("questions")
-    .select("id")
+    .select("id, user_id")
     .eq("id", questionId)
-    .eq("user_id", employee.user.id)
-    .eq("status", "answered")
     .maybeSingle();
 
   if (questionError || !question) {
-    return { success: false, error: "Запитання не знайдено." };
+    return { success: false, error: "Чат не знайдено." };
   }
 
-  const { error } = await supabase.from("question_answer_reads").upsert(
+  if (!userIsAdmin && (question as { user_id: string }).user_id !== user.id) {
+    return { success: false, error: "Немає доступу до цього чату." };
+  }
+
+  const { data: latestMessage } = await supabase
+    .from("question_messages")
+    .select("created_at")
+    .eq("question_id", questionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const lastReadAt =
+    (latestMessage as { created_at?: string } | null)?.created_at ?? new Date().toISOString();
+
+  const { error } = await supabase.from("question_chat_reads").upsert(
     {
-      user_id: employee.user.id,
       question_id: questionId,
-      read_at: new Date().toISOString(),
+      user_id: user.id,
+      last_read_at: lastReadAt,
     } as never,
-    { onConflict: "user_id,question_id" },
+    { onConflict: "question_id,user_id" },
   );
 
   if (error) {
-    console.error("Failed to mark question answer read:", error.message);
-    return { success: false, error: "Не вдалося позначити відповідь прочитаною." };
+    console.error("Failed to mark chat read:", error.message);
+    return { success: false, error: "Не вдалося позначити чат прочитаним." };
   }
 
   revalidateEmployeeBadgePaths(["/questions", "/dashboard"]);
 
   return { success: true };
+}
+
+/** @deprecated Prefer markQuestionChatRead */
+export async function markQuestionAnswerRead(questionId: string): Promise<MarkReadResult> {
+  return markQuestionChatRead(questionId);
 }
 
 export async function markPriceRead(fileId: string): Promise<MarkReadResult> {

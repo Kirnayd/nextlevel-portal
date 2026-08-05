@@ -267,6 +267,32 @@ async function getActiveEmployeeIds(): Promise<string[]> {
   return activeIds;
 }
 
+async function getActiveAdminIds(): Promise<string[]> {
+  const admin = createAdminClient();
+
+  const { data: profiles, error } = await admin.from("profiles").select("id").eq("role", "admin");
+
+  if (error) {
+    console.error("Failed to load admin profiles for push:", error.message);
+    return [];
+  }
+
+  const adminIds = (profiles ?? []).map((profile) => (profile as { id: string }).id);
+  const activeIds: string[] = [];
+
+  for (const userId of adminIds) {
+    const { data, error: userError } = await admin.auth.admin.getUserById(userId);
+
+    if (userError || !data.user || isAuthUserBlocked(data.user)) {
+      continue;
+    }
+
+    activeIds.push(userId);
+  }
+
+  return activeIds;
+}
+
 async function loadSubscriptionsForUsers(userIds: string[]): Promise<PushSubscriptionRow[]> {
   if (userIds.length === 0) {
     return [];
@@ -468,6 +494,16 @@ export async function sendPushToAllEmployees(
 ): Promise<PushSendSummary> {
   const employeeIds = await getActiveEmployeeIds();
   return sendPushToUsers(employeeIds, payload, options);
+}
+
+export async function sendPushToAllAdmins(
+  payload: PushNotificationPayload,
+  options?: PushSendOptions & { excludeUserId?: string },
+): Promise<PushSendSummary> {
+  const adminIds = (await getActiveAdminIds()).filter(
+    (userId) => userId !== options?.excludeUserId,
+  );
+  return sendPushToUsers(adminIds, payload, options);
 }
 
 export const PUSH_DELIVERY_WARNING =

@@ -14,9 +14,10 @@ const textareaClassName = cn(
 
 type QuestionFormProps = {
   onCancel?: () => void;
+  onCreated?: (questionId: string) => void;
 };
 
-export function QuestionForm({ onCancel }: QuestionFormProps) {
+export function QuestionForm({ onCancel, onCreated }: QuestionFormProps) {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,9 +40,11 @@ export function QuestionForm({ onCancel }: QuestionFormProps) {
       }
 
       form.reset();
-      setSuccessMessage("Запитання успішно надіслано");
+      setSuccessMessage("Звернення створено");
 
-      if (onCancel) {
+      if (result.questionId) {
+        onCreated?.(result.questionId);
+      } else if (onCancel) {
         onCancel();
       }
     } catch (error) {
@@ -76,7 +79,7 @@ export function QuestionForm({ onCancel }: QuestionFormProps) {
           name="message"
           required
           disabled={isSubmitting}
-          placeholder="Деталі вашого запитання"
+          placeholder="Деталі вашого звернення"
           className={textareaClassName}
         />
       </div>

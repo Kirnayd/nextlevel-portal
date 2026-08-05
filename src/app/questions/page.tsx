@@ -1,20 +1,23 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { getQuestions } from "@/features/questions/actions";
-import { EmployeeQuestionPanel } from "@/features/questions/components/employee-question-panel";
-import { QuestionList } from "@/features/questions/components/question-list";
-import { QuestionStatusFilter } from "@/features/questions/components/question-status-filter";
+import { getConversationSummaries } from "@/features/questions/actions";
+import { QuestionsChatView } from "@/features/questions/components/questions-chat-view";
 import type { QuestionFilter } from "@/features/questions/constants";
 import { getSessionContext } from "@/shared/lib/auth";
 import { Button } from "@/shared/components/ui/button";
 
 type QuestionsPageProps = {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; id?: string }>;
 };
 
 function normalizeFilter(status: string | undefined): QuestionFilter {
-  if (status === "new" || status === "progress" || status === "answered") {
+  if (
+    status === "new" ||
+    status === "progress" ||
+    status === "answered" ||
+    status === "unread"
+  ) {
     return status;
   }
 
@@ -31,20 +34,21 @@ export default async function QuestionsPage({ searchParams }: QuestionsPageProps
   const params = await searchParams;
   const userIsAdmin = session.isAdmin;
   const activeFilter = userIsAdmin ? normalizeFilter(params.status) : "all";
-  const questions = await getQuestions(userIsAdmin ? activeFilter : undefined, {
-    userIsAdmin,
-  });
+  const conversations = await getConversationSummaries(
+    userIsAdmin ? activeFilter : undefined,
+    { userIsAdmin },
+  );
 
   return (
-    <main className="min-h-screen bg-background px-4 py-10">
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+    <main className="min-h-screen bg-background px-4 py-6 sm:py-10">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Запитання</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {userIsAdmin
-                ? "Перегляд і обробка запитань від співробітників."
-                : "Ваші звернення до адміністратора."}
+                ? "Чати зі співробітниками: відповіді, статуси та історія повідомлень."
+                : "Ваші звернення до адміністратора в форматі чату."}
             </p>
           </div>
 
@@ -55,11 +59,13 @@ export default async function QuestionsPage({ searchParams }: QuestionsPageProps
           </Button>
         </div>
 
-        {userIsAdmin ? <QuestionStatusFilter activeFilter={activeFilter} /> : null}
-
-        {!userIsAdmin ? <EmployeeQuestionPanel /> : null}
-
-        <QuestionList questions={questions} isAdmin={userIsAdmin} />
+        <QuestionsChatView
+          initialConversations={conversations}
+          isAdmin={userIsAdmin}
+          currentUserId={session.user.id}
+          activeFilter={activeFilter}
+          initialQuestionId={params.id ?? null}
+        />
       </div>
     </main>
   );

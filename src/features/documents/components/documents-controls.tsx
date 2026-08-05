@@ -11,6 +11,7 @@ type DocumentsControlsProps = {
   hideEmpty: boolean;
   onHideEmptyChange: (value: boolean) => void;
   preferencesReady: boolean;
+  showHideEmptyToggle?: boolean;
 };
 
 export function DocumentsControls({
@@ -19,6 +20,7 @@ export function DocumentsControls({
   hideEmpty,
   onHideEmptyChange,
   preferencesReady,
+  showHideEmptyToggle = true,
 }: DocumentsControlsProps) {
   return (
     <div className="flex flex-col gap-4 rounded-lg border bg-card p-4 sm:flex-row sm:items-end sm:justify-between">
@@ -38,16 +40,18 @@ export function DocumentsControls({
         </div>
       </div>
 
-      <label className="flex cursor-pointer items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          className="size-4 rounded border border-input accent-primary"
-          checked={hideEmpty}
-          disabled={!preferencesReady}
-          onChange={(event) => onHideEmptyChange(event.target.checked)}
-        />
-        <span>Приховати порожні категорії</span>
-      </label>
+      {showHideEmptyToggle ? (
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 rounded border border-input accent-primary"
+            checked={hideEmpty}
+            disabled={!preferencesReady}
+            onChange={(event) => onHideEmptyChange(event.target.checked)}
+          />
+          <span>Приховати порожні категорії</span>
+        </label>
+      ) : null}
     </div>
   );
 }

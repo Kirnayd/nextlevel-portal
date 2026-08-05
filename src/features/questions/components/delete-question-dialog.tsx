@@ -59,9 +59,11 @@ export function DeleteQuestionDialog({
       >
         <div className="space-y-2">
           <h2 id="delete-question-title" className="text-lg font-semibold">
-            Видалити запитання?
+            Видалити чат?
           </h2>
-          <p className="text-sm text-muted-foreground">Цю дію неможливо скасувати.</p>
+          <p className="text-sm text-muted-foreground">
+            Усі повідомлення цього чату буде видалено. Цю дію неможливо скасувати.
+          </p>
         </div>
 
         {errorMessage ? (

@@ -2,11 +2,13 @@ import "server-only";
 
 import {
   createNotificationForUser,
+  createNotificationsForAdminsWithPerUserEventKeys,
   createNotificationsForEmployees,
 } from "@/infrastructure/notifications/create-user-notifications";
 import { recordNotificationEvent } from "@/infrastructure/push/notification-events";
 import {
   getPushWarningFromSummary,
+  sendPushToAllAdmins,
   sendPushToAllEmployees,
   sendPushToUser,
 } from "@/infrastructure/push/send-push-notification";
@@ -16,7 +18,11 @@ export async function notifyAnnouncementPublished(
   title: string,
 ): Promise<string | undefined> {
   const eventKey = `announcement-published:${announcementId}`;
-  const isFirstEvent = await recordNotificationEvent(eventKey, "announcement-published", announcementId);
+  const isFirstEvent = await recordNotificationEvent(
+    eventKey,
+    "announcement-published",
+    announcementId,
+  );
 
   if (!isFirstEvent) {
     return undefined;
@@ -44,7 +50,10 @@ export async function notifyAnnouncementPublished(
   return getPushWarningFromSummary(summary);
 }
 
-export async function notifyPriceUpdated(fileId: string, updatedAt: string): Promise<string | undefined> {
+export async function notifyPriceUpdated(
+  fileId: string,
+  updatedAt: string,
+): Promise<string | undefined> {
   const eventKey = `price-updated:${fileId}:${updatedAt}`;
   const isFirstEvent = await recordNotificationEvent(eventKey, "price-updated", fileId);
 
@@ -80,31 +89,81 @@ export async function notifyQuestionAnswered(
   questionUserId: string,
   subject: string,
 ): Promise<string | undefined> {
-  const eventKey = `question-answered:${answerId}`;
-  const isFirstEvent = await recordNotificationEvent(eventKey, "question-answered", answerId);
+  return notifyEmployeeQuestionMessage(answerId, questionId, questionUserId, subject);
+}
+
+export async function notifyEmployeeQuestionMessage(
+  messageId: string,
+  questionId: string,
+  questionUserId: string,
+  subject: string,
+): Promise<string | undefined> {
+  const eventKey = `question-message:${messageId}:employee`;
+  const isFirstEvent = await recordNotificationEvent(eventKey, "question-message", messageId);
 
   if (!isFirstEvent) {
     return undefined;
   }
 
+  const body = subject.trim().slice(0, 200);
+
   void createNotificationForUser(questionUserId, {
-    type: "question_answer",
-    title: "Відповідь на запитання",
-    body: subject.trim().slice(0, 200),
+    type: "question_message",
+    title: "Нове повідомлення адміністратора",
+    body,
     url: "/questions",
     entity_id: questionId,
-    event_key: `question_answer:${answerId}`,
+    event_key: `question-message:${messageId}:employee:${questionUserId}`,
   });
 
   const summary = await sendPushToUser(
     questionUserId,
     {
-      title: "Відповідь на запитання",
-      body: subject.trim().slice(0, 200),
+      title: "Нове повідомлення адміністратора",
+      body,
       url: "/questions",
-      tag: `question-${answerId}`,
+      tag: `question-message-${messageId}`,
     },
-    { eventType: "question-answered" },
+    { eventType: "question-message-employee" },
+  );
+
+  return getPushWarningFromSummary(summary);
+}
+
+export async function notifyAdminsQuestionMessage(
+  messageId: string,
+  questionId: string,
+  subject: string,
+  employeeLabel: string,
+): Promise<string | undefined> {
+  const eventKey = `question-message:${messageId}:admins`;
+  const isFirstEvent = await recordNotificationEvent(eventKey, "question-message", messageId);
+
+  if (!isFirstEvent) {
+    return undefined;
+  }
+
+  const body = `${employeeLabel}: ${subject}`.trim().slice(0, 200);
+
+  void createNotificationsForAdminsWithPerUserEventKeys(
+    {
+      type: "question_message",
+      title: "Нове повідомлення від менеджера",
+      body,
+      url: "/questions",
+      entity_id: questionId,
+    },
+    (adminId) => `question-message:${messageId}:admin:${adminId}`,
+  );
+
+  const summary = await sendPushToAllAdmins(
+    {
+      title: "Нове повідомлення від менеджера",
+      body,
+      url: "/questions",
+      tag: `question-message-${messageId}`,
+    },
+    { eventType: "question-message-admin" },
   );
 
   return getPushWarningFromSummary(summary);

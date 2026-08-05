@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { getNewQuestionsCount } from "@/features/questions/actions";
+import { getUnreadQuestionMessagesCount } from "@/features/questions/actions";
 import { NewQuestionsBadge } from "@/features/questions/components/new-questions-badge";
 import { createClient } from "@/infrastructure/supabase/client";
 
@@ -20,10 +20,10 @@ export function QuestionsNavLink({ initialCount }: QuestionsNavLinkProps) {
 
   const refreshCount = useCallback(async () => {
     try {
-      const nextCount = await getNewQuestionsCount();
+      const nextCount = await getUnreadQuestionMessagesCount();
       setCount(nextCount);
     } catch (error) {
-      console.error("Failed to refresh new questions count:", error);
+      console.error("Failed to refresh unread questions count:", error);
     }
   }, []);
 
@@ -45,13 +45,24 @@ export function QuestionsNavLink({ initialCount }: QuestionsNavLinkProps) {
     const supabase = createClient();
 
     const channel = supabase
-      .channel("admin-new-questions-count")
+      .channel("admin-unread-question-messages")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "question_messages",
+        },
+        () => {
+          void refreshCount();
+        },
+      )
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "questions",
+          table: "question_chat_reads",
         },
         () => {
           void refreshCount();

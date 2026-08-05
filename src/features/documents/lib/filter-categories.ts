@@ -108,7 +108,7 @@ export function filterCategoriesForDisplay(
         return documentCount > 0;
       }
 
-      if (hideEmpty) {
+      if (hideEmpty && !isAdmin) {
         return documentCount > 0;
       }
 

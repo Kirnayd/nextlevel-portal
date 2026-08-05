@@ -12,13 +12,17 @@ import {
   CardTitle,
 } from "@/shared/components/ui/card";
 
-export function EmployeeQuestionPanel() {
+type EmployeeQuestionPanelProps = {
+  onCreated?: (questionId: string) => void;
+};
+
+export function EmployeeQuestionPanel({ onCreated }: EmployeeQuestionPanelProps) {
   const [isFormVisible, setIsFormVisible] = useState(false);
 
   if (!isFormVisible) {
     return (
       <Button type="button" onClick={() => setIsFormVisible(true)}>
-        Поставити запитання
+        Нове звернення
       </Button>
     );
   }
@@ -26,13 +30,19 @@ export function EmployeeQuestionPanel() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Нове запитання</CardTitle>
+        <CardTitle>Нове звернення</CardTitle>
         <CardDescription>
-          Опишіть ваше запитання — адміністратор отримає його та відповість.
+          Вкажіть тему та перше повідомлення. Далі ви зможете продовжити листування в чаті.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <QuestionForm onCancel={() => setIsFormVisible(false)} />
+        <QuestionForm
+          onCancel={() => setIsFormVisible(false)}
+          onCreated={(questionId) => {
+            setIsFormVisible(false);
+            onCreated?.(questionId);
+          }}
+        />
       </CardContent>
     </Card>
   );
