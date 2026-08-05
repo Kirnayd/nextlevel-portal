@@ -1,4 +1,4 @@
-const CACHE_VERSION = "nextlevel-static-v4";
+const CACHE_VERSION = "nextlevel-static-v5";
 const STATIC_CACHE = `${CACHE_VERSION}-assets`;
 const NOTIFICATION_ICON = "/icons/icon-192.png";
 const NOTIFICATION_BADGE = "/icons/icon-192.png";
@@ -14,7 +14,11 @@ const ALLOWED_NOTIFICATION_ROUTES = new Set([
 ]);
 
 function shouldNeverCache(url) {
-  return url.origin !== self.location.origin;
+  if (url.origin !== self.location.origin) {
+    return true;
+  }
+
+  return NEVER_CACHE_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
 }
 
 function isStaticAsset(url) {

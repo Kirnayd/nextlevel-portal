@@ -29,7 +29,7 @@ export function PriceDownloadActions({ priceFile }: PriceDownloadActionsProps) {
     setIsDownloading(true);
 
     try {
-      const blob = await fetchAuthenticatedFileBlob("/api/price/download");
+      const blob = await fetchAuthenticatedFileBlob("/api/price/file?disposition=attachment");
       downloadFileBlob(blob, priceFile.original_filename);
     } catch (error) {
       console.error("Failed to download price file:", error);
@@ -43,7 +43,7 @@ export function PriceDownloadActions({ priceFile }: PriceDownloadActionsProps) {
     setIsSharing(true);
 
     try {
-      const blob = await fetchAuthenticatedFileBlob("/api/price/download");
+      const blob = await fetchAuthenticatedFileBlob("/api/price/file?disposition=attachment");
       await shareAuthenticatedFile({
         blob,
         filename: priceFile.original_filename,

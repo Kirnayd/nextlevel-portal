@@ -28,7 +28,7 @@ export function PriceFileActions({ priceFile }: PriceFileActionsProps) {
       <div className="flex flex-wrap gap-2">
         {isExcel ? (
           <FileOpenTrigger
-            downloadUrl="/api/price/download"
+            downloadUrl="/api/price/file"
             filename={priceFile.original_filename}
             mimeType={priceFile.mime_type}
             fileTypeLabel="Excel"
@@ -42,7 +42,7 @@ export function PriceFileActions({ priceFile }: PriceFileActionsProps) {
 
         {isPdf ? (
           <FileOpenTrigger
-            downloadUrl="/api/price/download"
+            downloadUrl="/api/price/file"
             filename={priceFile.original_filename}
             mimeType={priceFile.mime_type}
             fileTypeLabel="PDF"

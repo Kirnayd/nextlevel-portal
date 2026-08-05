@@ -39,7 +39,9 @@ export async function getCurrentPriceFile(): Promise<PriceFile | null> {
 
   const { data, error } = await supabase
     .from("files")
-    .select("id, original_filename, mime_type, size_bytes, updated_at, category")
+    .select(
+      "id, storage_path, original_filename, mime_type, size_bytes, updated_at, category, created_at, uploaded_by",
+    )
     .eq("category", PRICE_CATEGORY)
     .maybeSingle();
 
@@ -123,7 +125,15 @@ export async function uploadPriceFile(formData: FormData): Promise<UploadPriceRe
       return { success: false, error: "Не вдалося оновити метадані файлу." };
     }
 
-    await supabase.storage.from(PRICE_STORAGE_BUCKET).remove([existingPrice.storage_path]);
+    if (existingPrice.storage_path) {
+      const { error: removeError } = await supabase.storage
+        .from(PRICE_STORAGE_BUCKET)
+        .remove([existingPrice.storage_path]);
+
+      if (removeError) {
+        console.error("Failed to remove previous price storage object:", removeError.message);
+      }
+    }
   } else {
     const { error: insertError } = await supabase
       .from("files")

@@ -1,5 +1,24 @@
 export type ShareFileResult = "shared" | "downloaded" | "cancelled";
 
+async function readFetchErrorMessage(response: Response): Promise<string> {
+  const fallback = `Failed to fetch file: ${response.status}`;
+
+  try {
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as { error?: unknown };
+      if (typeof payload.error === "string" && payload.error.trim()) {
+        return payload.error;
+      }
+    }
+  } catch {
+    // Ignore parse failures and keep the fallback status message.
+  }
+
+  return fallback;
+}
+
 export async function fetchAuthenticatedFileBlob(
   downloadUrl: string,
   signal?: AbortSignal,
@@ -7,10 +26,17 @@ export async function fetchAuthenticatedFileBlob(
   const response = await fetch(downloadUrl, {
     credentials: "include",
     signal,
+    cache: "no-store",
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch file: ${response.status}`);
+    throw new Error(await readFetchErrorMessage(response));
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    throw new Error(await readFetchErrorMessage(response));
   }
 
   return response.blob();
