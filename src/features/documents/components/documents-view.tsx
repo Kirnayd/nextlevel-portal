@@ -9,7 +9,9 @@ import { DocumentsControls } from "@/features/documents/components/documents-con
 import { getCategoryDocumentCount } from "@/features/documents/lib/category-helpers";
 import { filterCategoriesForDisplay } from "@/features/documents/lib/filter-categories";
 import { useHideEmptyCategoriesPreference } from "@/features/documents/lib/use-hide-empty-categories";
+import { HIDE_EMPTY_CATEGORIES_STORAGE_KEY } from "@/features/documents/constants";
 import { useDebouncedValue } from "@/shared/lib/use-debounced-value";
+import type { UserRole } from "@/shared/lib/auth";
 import {
   Card,
   CardDescription,
@@ -36,16 +38,18 @@ const SortableCategoryList = dynamic(
 type DocumentsViewProps = {
   categories: DocumentCategoryWithDocuments[];
   isAdmin: boolean;
+  role: UserRole;
 };
 
-export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
+export function DocumentsView({ categories, isAdmin, role }: DocumentsViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 250);
   // Source of truth — never overwritten by search/hide-empty filtering.
   const [allCategories, setAllCategories] = useState(categories);
 
   const employeeHideEmptyPreference = useHideEmptyCategoriesPreference(true);
-  const hideEmpty = isAdmin ? false : employeeHideEmptyPreference.hideEmpty;
+  // Admin must never be affected by employee localStorage preference.
+  const hideEmptyForEmployees = employeeHideEmptyPreference.hideEmpty;
   const preferencesReady = isAdmin ? true : employeeHideEmptyPreference.isReady;
 
   useEffect(() => {
@@ -53,17 +57,54 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
   }, [categories]);
 
   const visibleCategories = useMemo(() => {
-    if (isAdmin && debouncedSearchQuery.trim().length === 0) {
-      return allCategories;
+    if (isAdmin) {
+      if (debouncedSearchQuery.trim().length === 0) {
+        return allCategories;
+      }
+
+      return filterCategoriesForDisplay(allCategories, debouncedSearchQuery, false, true);
     }
 
     return filterCategoriesForDisplay(
       allCategories,
       debouncedSearchQuery,
-      hideEmpty,
-      isAdmin,
+      hideEmptyForEmployees,
+      false,
     );
-  }, [allCategories, debouncedSearchQuery, hideEmpty, isAdmin]);
+  }, [allCategories, debouncedSearchQuery, hideEmptyForEmployees, isAdmin]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") {
+      return;
+    }
+
+    let storedHideEmpty: string | null = null;
+
+    try {
+      storedHideEmpty = window.localStorage.getItem(HIDE_EMPTY_CATEGORIES_STORAGE_KEY);
+    } catch {
+      storedHideEmpty = "unreadable";
+    }
+
+    console.info("[documents-view]", {
+      isAdmin,
+      role,
+      categoriesReceived: categories.length,
+      allCategoriesCount: allCategories.length,
+      visibleCategoriesCount: visibleCategories.length,
+      hideEmptyForEmployees,
+      storedHideEmpty,
+      searchQuery: debouncedSearchQuery,
+    });
+  }, [
+    allCategories.length,
+    categories.length,
+    debouncedSearchQuery,
+    hideEmptyForEmployees,
+    isAdmin,
+    role,
+    visibleCategories.length,
+  ]);
 
   const documentCountByCategoryId = useMemo(
     () =>
@@ -94,13 +135,20 @@ export function DocumentsView({ categories, isAdmin }: DocumentsViewProps) {
 
   return (
     <div className="space-y-6">
+      {process.env.NODE_ENV === "development" ? (
+        <div className="rounded-md border border-dashed bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
+          Role: {role} · Categories loaded: {allCategories.length} · Categories visible:{" "}
+          {visibleCategories.length} · Hide empty: {String(isAdmin ? false : hideEmptyForEmployees)}
+        </div>
+      ) : null}
+
       {isAdmin ? <AdminToolbar categories={allCategories} /> : null}
 
       {hasCategories ? (
         <DocumentsControls
           searchQuery={searchQuery}
           onSearchQueryChange={setSearchQuery}
-          hideEmpty={hideEmpty}
+          hideEmpty={hideEmptyForEmployees}
           onHideEmptyChange={employeeHideEmptyPreference.setHideEmpty}
           preferencesReady={preferencesReady}
           showHideEmptyToggle={!isAdmin}

@@ -22,18 +22,39 @@ export const getAuthenticatedUser = cache(async (): Promise<User | null> => {
   return user;
 });
 
-export const getUserRole = cache(async (userId: string): Promise<UserRole> => {
+export const getUserRole = cache(async (userId: string): Promise<UserRole | null> => {
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", userId)
     .maybeSingle();
 
+  if (error) {
+    console.error("[auth] Failed to load profile role:", {
+      userId,
+      message: error.message,
+    });
+    return null;
+  }
+
   const profile = data as { role: UserRole } | null;
 
-  return profile?.role ?? "employee";
+  if (!profile?.role) {
+    console.error("[auth] Profile role missing:", { userId });
+    return null;
+  }
+
+  if (profile.role !== "admin" && profile.role !== "employee") {
+    console.error("[auth] Unexpected profile role:", {
+      userId,
+      role: profile.role,
+    });
+    return null;
+  }
+
+  return profile.role;
 });
 
 export const isAdmin = cache(async (userId: string): Promise<boolean> => {
@@ -49,6 +70,10 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
   }
 
   const role = await getUserRole(user.id);
+
+  if (!role) {
+    return null;
+  }
 
   return {
     user,

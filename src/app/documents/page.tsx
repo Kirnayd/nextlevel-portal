@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { getDocumentCategoriesWithDocuments } from "@/features/documents/actions";
 import { DocumentsView } from "@/features/documents/components/documents-view";
+import { getCategoryDocumentCount } from "@/features/documents/lib/category-helpers";
 import { getSessionContext } from "@/shared/lib/auth";
 import { Button } from "@/shared/components/ui/button";
 
@@ -13,8 +14,33 @@ export default async function DocumentsPage() {
     redirect("/login");
   }
 
+  const role = session.role;
+  const userIsAdmin = role === "admin";
   const categories = await getDocumentCategoriesWithDocuments();
-  const userIsAdmin = session.isAdmin;
+
+  if (process.env.NODE_ENV === "development") {
+    console.info("[documents-page]", {
+      userId: session.user.id,
+      role,
+      isAdmin: userIsAdmin,
+      categoriesLoaded: categories.length,
+      subcategoriesLoaded: categories.reduce(
+        (sum, category) => sum + category.subcategories.length,
+        0,
+      ),
+      documentsLoaded: categories.reduce(
+        (sum, category) => sum + getCategoryDocumentCount(category),
+        0,
+      ),
+      emptyFilterApplied: false,
+      categorySummary: categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        subcategoryCount: category.subcategories.length,
+        documentCount: getCategoryDocumentCount(category),
+      })),
+    });
+  }
 
   return (
     <main className="min-h-screen bg-background px-4 py-10">
@@ -36,7 +62,7 @@ export default async function DocumentsPage() {
           </Button>
         </div>
 
-        <DocumentsView categories={categories} isAdmin={userIsAdmin} />
+        <DocumentsView categories={categories} isAdmin={userIsAdmin} role={role} />
       </div>
     </main>
   );

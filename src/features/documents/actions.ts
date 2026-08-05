@@ -115,8 +115,8 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
 
   const supabase = await createClient();
 
-  // Always load the complete category + subcategory structure, then attach documents.
-  // Do not filter by document existence — empty categories/subcategories must remain.
+  // Load complete structure from category/subcategory tables, then attach documents.
+  // Column lists must match the real schema (no invented updated_at/sort_order fields).
   const [
     { data: categories, error: categoriesError },
     { data: subcategories, error: subcategoriesError },
@@ -124,41 +124,58 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
   ] = await Promise.all([
     supabase
       .from("document_categories")
-      .select("id, name, sort_order, created_at, updated_at")
+      .select("id, name, sort_order, created_at")
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
     supabase
       .from("document_subcategories")
-      .select("id, category_id, name, sort_order, created_at, updated_at")
+      .select("id, category_id, name, sort_order, created_at")
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
     supabase
       .from("documents")
       .select(
-        "id, category_id, subcategory_id, title, original_filename, mime_type, size_bytes, sort_order, created_at, updated_at",
+        "id, category_id, subcategory_id, title, original_filename, mime_type, size_bytes, created_at, updated_at",
       )
       .order("created_at", { ascending: false }),
   ]);
 
   if (categoriesError) {
-    console.error("Failed to load document categories:", categoriesError.message);
+    console.error("[documents] Failed to load document_categories:", {
+      message: categoriesError.message,
+      code: categoriesError.code,
+      userId: user.id,
+    });
     return [];
   }
 
+  // Subcategory/document failures must not wipe the category tree (empty categories must remain visible).
   if (subcategoriesError) {
-    console.error("Failed to load document subcategories:", subcategoriesError.message);
-    return [];
+    console.error("[documents] Failed to load document_subcategories:", {
+      message: subcategoriesError.message,
+      code: subcategoriesError.code,
+      userId: user.id,
+    });
   }
 
   if (documentsError) {
-    console.error("Failed to load documents:", documentsError.message);
-    return [];
+    console.error("[documents] Failed to load documents:", {
+      message: documentsError.message,
+      code: documentsError.code,
+      userId: user.id,
+    });
   }
+
+  const categoryRows = (categories ?? []) as DocumentCategory[];
+  const subcategoryRows = subcategoriesError
+    ? []
+    : ((subcategories ?? []) as DocumentSubcategory[]);
+  const documentRows = documentsError ? [] : ((documents ?? []) as Document[]);
 
   const documentsBySubcategory = new Map<string, Document[]>();
   const uncategorizedByCategory = new Map<string, Document[]>();
 
-  for (const document of (documents ?? []) as Document[]) {
+  for (const document of documentRows) {
     if (document.subcategory_id) {
       const existing = documentsBySubcategory.get(document.subcategory_id) ?? [];
       existing.push(document);
@@ -173,7 +190,7 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
 
   const subcategoriesByCategory = new Map<string, DocumentSubcategoryWithDocuments[]>();
 
-  for (const subcategory of (subcategories ?? []) as DocumentSubcategory[]) {
+  for (const subcategory of subcategoryRows) {
     const existing = subcategoriesByCategory.get(subcategory.category_id) ?? [];
     existing.push({
       ...subcategory,
@@ -182,7 +199,7 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
     subcategoriesByCategory.set(subcategory.category_id, existing);
   }
 
-  return ((categories ?? []) as DocumentCategory[]).map((category) => {
+  const result = categoryRows.map((category) => {
     const categorySubcategories = subcategoriesByCategory.get(category.id) ?? [];
     const uncategorizedDocuments = uncategorizedByCategory.get(category.id) ?? [];
 
@@ -192,6 +209,23 @@ export async function getDocumentCategoriesWithDocuments(): Promise<DocumentCate
       uncategorizedDocuments,
     };
   });
+
+  if (process.env.NODE_ENV === "development") {
+    console.info("[documents] structure loaded", {
+      userId: user.id,
+      categories: result.length,
+      subcategories: subcategoryRows.length,
+      documents: documentRows.length,
+      emptyCategories: result.filter(
+        (category) =>
+          category.subcategories.every((subcategory) => subcategory.documents.length === 0) &&
+          category.uncategorizedDocuments.length === 0,
+      ).length,
+      emptyFilterApplied: false,
+    });
+  }
+
+  return result;
 }
 
 export async function createCategory(formData: FormData): Promise<ActionResult> {
