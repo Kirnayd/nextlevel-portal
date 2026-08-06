@@ -7,6 +7,7 @@ import {
   removePushSubscription,
   savePushSubscription,
 } from "@/features/push/actions";
+import { isAppBadgeSupported } from "@/features/app-badge/app-badge";
 import { Button } from "@/shared/components/ui/button";
 import {
   isIosSafariNotInstalled,
@@ -30,6 +31,7 @@ export function PushNotificationSettings() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const [activeEndpoint, setActiveEndpoint] = useState<string | null>(null);
+  const [showBadgeHint, setShowBadgeHint] = useState(false);
 
   const refreshSubscriptionState = useCallback(async () => {
     if (!isPushApiSupported()) {
@@ -68,6 +70,7 @@ export function PushNotificationSettings() {
 
   useEffect(() => {
     void refreshSubscriptionState();
+    setShowBadgeHint(isAppBadgeSupported());
   }, [refreshSubscriptionState]);
 
   async function handleEnableNotifications() {
@@ -245,6 +248,11 @@ export function PushNotificationSettings() {
     <div className="mt-6 w-full space-y-3 rounded-lg border p-4">
       <h2 className="text-base font-semibold">Сповіщення</h2>
       {renderBody()}
+      {showBadgeHint && (uiState === "subscribed" || uiState === "ready") ? (
+        <p className="text-xs text-muted-foreground">
+          Кількість непрочитаних може відображатися на іконці застосунку.
+        </p>
+      ) : null}
     </div>
   );
 }

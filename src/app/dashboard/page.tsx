@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { LogoutButton } from "@/features/app-badge/logout-button";
 import { DashboardPushSettings } from "@/features/dashboard/components/dashboard-push-settings";
 import { NotificationCenter } from "@/features/notifications/components/notification-center";
 import { fetchUnreadNotificationCount } from "@/features/notifications/actions";
@@ -82,14 +83,7 @@ export default async function DashboardPage() {
 
         <DashboardPushSettings />
 
-        <form action="/api/logout" method="post" className="mt-6">
-          <button
-            type="submit"
-            className="rounded-md bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-          >
-            Вийти
-          </button>
-        </form>
+        <LogoutButton className="mt-6">Вийти</LogoutButton>
       </div>
     </main>
   );

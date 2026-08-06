@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { ClearAppBadgeOnMount } from "@/features/app-badge/clear-app-badge-on-mount";
 import { createClient } from "@/infrastructure/supabase/client";
 
 export default function LoginPage() {
@@ -49,11 +50,14 @@ export default function LoginPage() {
       
         setErrorMessage(message);
         console.error("Login error:", error);
+      } finally {
+        setIsLoading(false);
       }
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
+      <ClearAppBadgeOnMount />
       <section className="w-full max-w-md rounded-2xl border bg-card p-8 shadow-lg">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-semibold tracking-tight">Nextlevel</h1>

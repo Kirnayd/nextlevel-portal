@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 
+import { syncAppBadge } from "@/features/app-badge/app-badge";
 import { fetchUnreadNotificationCount } from "@/features/notifications/actions";
 import { getUnreadBadgeLabel } from "@/features/notifications/lib/format";
 import { NavCountBadge } from "@/shared/components/nav-count-badge";
@@ -29,6 +30,10 @@ export function NotificationCenter({ initialUnreadCount }: NotificationCenterPro
     setUnreadCount(initialUnreadCount);
   }, [initialUnreadCount]);
 
+  useEffect(() => {
+    void syncAppBadge(unreadCount);
+  }, [unreadCount]);
+
   const refreshUnreadCount = useCallback(async () => {
     try {
       const nextCount = await fetchUnreadNotificationCount();
@@ -45,10 +50,18 @@ export function NotificationCenter({ initialUnreadCount }: NotificationCenterPro
       }
     }
 
+    function handlePageShow(event: PageTransitionEvent) {
+      if (event.persisted || document.visibilityState === "visible") {
+        void refreshUnreadCount();
+      }
+    }
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
     };
   }, [refreshUnreadCount]);
 

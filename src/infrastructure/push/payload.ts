@@ -18,7 +18,17 @@ export type PushNotificationPayload = {
   url: string;
   tag?: string;
   renotify?: boolean;
+  unreadCount?: number;
+  badgeDelta?: number;
 };
+
+function normalizeOptionalCount(value: number | undefined): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.floor(value));
+}
 
 export function validatePushPayload(payload: PushNotificationPayload): PushNotificationPayload | null {
   const title = payload.title.trim().slice(0, MAX_TITLE_LENGTH);
@@ -43,17 +53,26 @@ export function validatePushPayload(payload: PushNotificationPayload): PushNotif
     url: pathname,
     tag,
     renotify: payload.renotify ?? false,
+    unreadCount: normalizeOptionalCount(payload.unreadCount),
+    badgeDelta: normalizeOptionalCount(payload.badgeDelta),
   };
 }
 
 export function serializePushPayload(payload: PushNotificationPayload): string {
+  const unreadCount = normalizeOptionalCount(payload.unreadCount);
+  const badgeDelta = normalizeOptionalCount(payload.badgeDelta);
+
   return JSON.stringify({
     title: payload.title,
     body: payload.body,
     url: payload.url,
     tag: payload.tag ?? payload.url,
+    ...(unreadCount !== undefined ? { unreadCount } : {}),
+    ...(badgeDelta !== undefined ? { badgeDelta } : {}),
     data: {
       url: payload.url,
+      ...(unreadCount !== undefined ? { unreadCount } : {}),
+      ...(badgeDelta !== undefined ? { badgeDelta } : {}),
     },
   });
 }

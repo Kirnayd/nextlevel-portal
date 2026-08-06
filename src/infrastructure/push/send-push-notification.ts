@@ -338,6 +338,41 @@ async function loadSubscriptionsForUsers(userIds: string[]): Promise<PushSubscri
   return subscriptions;
 }
 
+async function loadUnreadNotificationCounts(userIds: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+
+  for (const userId of userIds) {
+    counts.set(userId, 0);
+  }
+
+  if (userIds.length === 0) {
+    return counts;
+  }
+
+  const admin = createAdminClient();
+
+  for (let index = 0; index < userIds.length; index += SUBSCRIPTION_BATCH_SIZE) {
+    const batch = userIds.slice(index, index + SUBSCRIPTION_BATCH_SIZE);
+
+    const { data, error } = await admin
+      .from("user_notifications")
+      .select("user_id")
+      .in("user_id", batch)
+      .eq("is_read", false);
+
+    if (error) {
+      console.error("Failed to load unread notification counts for push badge:", error.message);
+      continue;
+    }
+
+    for (const row of (data ?? []) as Array<{ user_id: string }>) {
+      counts.set(row.user_id, (counts.get(row.user_id) ?? 0) + 1);
+    }
+  }
+
+  return counts;
+}
+
 async function removeExpiredSubscription(subscriptionId: string): Promise<void> {
   const admin = createAdminClient();
 
@@ -387,7 +422,11 @@ async function sendToSubscription(
 async function sendToSubscriptions(
   subscriptions: PushSubscriptionRow[],
   payload: PushNotificationPayload,
-  context: { eventType: string; recipientCount: number },
+  context: {
+    eventType: string;
+    recipientCount: number;
+    unreadCountsByUserId?: Map<string, number>;
+  },
 ): Promise<PushSendSummary> {
   const summary: PushSendSummary = {
     sent: 0,
@@ -417,7 +456,19 @@ async function sendToSubscriptions(
   for (let index = 0; index < subscriptions.length; index += SEND_CONCURRENCY) {
     const batch = subscriptions.slice(index, index + SEND_CONCURRENCY);
     const results = await Promise.all(
-      batch.map((subscription) => sendToSubscription(subscription, payload, context.eventType)),
+      batch.map((subscription) => {
+        const unreadCount = context.unreadCountsByUserId?.get(subscription.user_id);
+        const personalizedPayload: PushNotificationPayload = {
+          ...payload,
+          ...(unreadCount !== undefined
+            ? { unreadCount }
+            : payload.badgeDelta !== undefined
+              ? { badgeDelta: payload.badgeDelta }
+              : { badgeDelta: 1 }),
+        };
+
+        return sendToSubscription(subscription, personalizedPayload, context.eventType);
+      }),
     );
 
     for (const result of results) {
@@ -520,9 +571,14 @@ export async function sendPushToUsers(
     };
   }
 
+  const unreadCountsByUserId = await loadUnreadNotificationCounts(
+    [...new Set(subscriptions.map((subscription) => subscription.user_id))],
+  );
+
   return sendToSubscriptions(subscriptions, validatedPayload, {
     eventType,
     recipientCount: uniqueUserIds.length,
+    unreadCountsByUserId,
   });
 }
 

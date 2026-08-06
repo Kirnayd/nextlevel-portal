@@ -32,25 +32,25 @@ export async function notifyAnnouncementPublished(
 
   const body = title.trim().slice(0, 200);
 
-  const [, summary] = await Promise.all([
-    createNotificationsForEmployees({
-      type: "announcement",
+  // Insert in-app rows first so per-user unreadCount in push payloads is authoritative.
+  await createNotificationsForEmployees({
+    type: "announcement",
+    title: "Нове оголошення",
+    body,
+    url: "/announcements",
+    entity_id: announcementId,
+    event_key: `announcement:${announcementId}`,
+  });
+
+  const summary = await sendPushToAllEmployees(
+    {
       title: "Нове оголошення",
       body,
       url: "/announcements",
-      entity_id: announcementId,
-      event_key: `announcement:${announcementId}`,
-    }),
-    sendPushToAllEmployees(
-      {
-        title: "Нове оголошення",
-        body,
-        url: "/announcements",
-        tag: `announcement-${announcementId}`,
-      },
-      { eventType: "announcement-published" },
-    ),
-  ]);
+      tag: `announcement-${announcementId}`,
+    },
+    { eventType: "announcement-published" },
+  );
 
   return getPushWarningFromSummary(summary);
 }
@@ -66,25 +66,24 @@ export async function notifyPriceUpdated(
     return undefined;
   }
 
-  const [, summary] = await Promise.all([
-    createNotificationsForEmployees({
-      type: "price",
+  await createNotificationsForEmployees({
+    type: "price",
+    title: "Оновлено прайс",
+    body: "Доступна нова версія прайсу.",
+    url: "/price",
+    entity_id: fileId,
+    event_key: `price:${fileId}:${updatedAt}`,
+  });
+
+  const summary = await sendPushToAllEmployees(
+    {
       title: "Оновлено прайс",
       body: "Доступна нова версія прайсу.",
       url: "/price",
-      entity_id: fileId,
-      event_key: `price:${fileId}:${updatedAt}`,
-    }),
-    sendPushToAllEmployees(
-      {
-        title: "Оновлено прайс",
-        body: "Доступна нова версія прайсу.",
-        url: "/price",
-        tag: `price-${fileId}`,
-      },
-      { eventType: "price-updated" },
-    ),
-  ]);
+      tag: `price-${fileId}`,
+    },
+    { eventType: "price-updated" },
+  );
 
   return getPushWarningFromSummary(summary);
 }
@@ -120,26 +119,25 @@ export async function notifyEmployeeQuestionMessage(
     senderRole: "admin",
   });
 
-  const [, summary] = await Promise.all([
-    createNotificationForUser(questionUserId, {
-      type: "question_message",
+  await createNotificationForUser(questionUserId, {
+    type: "question_message",
+    title: "Нове повідомлення адміністратора",
+    body,
+    url: "/questions",
+    entity_id: questionId,
+    event_key: `question-message:${messageId}:employee:${questionUserId}`,
+  });
+
+  const summary = await sendPushToUser(
+    questionUserId,
+    {
       title: "Нове повідомлення адміністратора",
       body,
       url: "/questions",
-      entity_id: questionId,
-      event_key: `question-message:${messageId}:employee:${questionUserId}`,
-    }),
-    sendPushToUser(
-      questionUserId,
-      {
-        title: "Нове повідомлення адміністратора",
-        body,
-        url: "/questions",
-        tag: `question-message-${messageId}`,
-      },
-      { eventType: "question-message-employee" },
-    ),
-  ]);
+      tag: `question-message-${messageId}`,
+    },
+    { eventType: "question-message-employee" },
+  );
 
   return getPushWarningFromSummary(summary);
 }
@@ -201,33 +199,33 @@ export async function notifyAdminsQuestionMessage(
       return undefined;
     }
 
-    const [inAppSummary, pushSummary] = await Promise.all([
-      createNotificationsForAdminIds(
-        adminIds,
-        {
-          type: "question_message",
-          title: "Нове повідомлення від менеджера",
-          body,
-          url: "/questions",
-          entity_id: questionId,
-        },
-        (adminId) => `question-message:${messageId}:admin:${adminId}`,
-      ),
-      sendPushToUsers(
-        adminIds,
-        {
-          title: "Нове повідомлення від менеджера",
-          body,
-          url: "/questions",
-          tag: `question-message-${messageId}`,
-        },
-        { eventType: "question-message-admin" },
-      ),
-    ]);
+    const inAppSummary = await createNotificationsForAdminIds(
+      adminIds,
+      {
+        type: "question_message",
+        title: "Нове повідомлення від менеджера",
+        body,
+        url: "/questions",
+        entity_id: questionId,
+      },
+      (adminId) => `question-message:${messageId}:admin:${adminId}`,
+    );
 
     inAppInsertAttempted = inAppSummary.attemptedCount;
     inAppInserted = inAppSummary.insertedCount;
     inAppInsertFailed = inAppSummary.failedCount;
+
+    const pushSummary = await sendPushToUsers(
+      adminIds,
+      {
+        title: "Нове повідомлення від менеджера",
+        body,
+        url: "/questions",
+        tag: `question-message-${messageId}`,
+      },
+      { eventType: "question-message-admin" },
+    );
+
     pushSubscriptionsFound = pushSummary.subscriptionsFound;
     pushSent = pushSummary.sent;
     pushFailed = pushSummary.failed;
@@ -316,25 +314,24 @@ export async function notifyDocumentCreated(
     body = `${trimmedTitle} · ${trimmedSubcategory}`;
   }
 
-  const [, summary] = await Promise.all([
-    createNotificationsForEmployees({
-      type: "document",
+  await createNotificationsForEmployees({
+    type: "document",
+    title: "Новий документ",
+    body: body.slice(0, 200),
+    url: "/documents",
+    entity_id: documentId,
+    event_key: `document:${documentId}`,
+  });
+
+  const summary = await sendPushToAllEmployees(
+    {
       title: "Новий документ",
       body: body.slice(0, 200),
       url: "/documents",
-      entity_id: documentId,
-      event_key: `document:${documentId}`,
-    }),
-    sendPushToAllEmployees(
-      {
-        title: "Новий документ",
-        body: body.slice(0, 200),
-        url: "/documents",
-        tag: `document-${documentId}`,
-      },
-      { eventType: "document-created" },
-    ),
-  ]);
+      tag: `document-${documentId}`,
+    },
+    { eventType: "document-created" },
+  );
 
   return getPushWarningFromSummary(summary);
 }

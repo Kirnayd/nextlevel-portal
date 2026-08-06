@@ -1,5 +1,7 @@
-const CACHE_VERSION = "nextlevel-static-v5";
+const CACHE_VERSION = "nextlevel-static-v6";
 const STATIC_CACHE = `${CACHE_VERSION}-assets`;
+const BADGE_CACHE = `${CACHE_VERSION}-badge`;
+const BADGE_COUNT_URL = "/__nextlevel_app_badge_count";
 const NOTIFICATION_ICON = "/icons/icon-192.png";
 const NOTIFICATION_BADGE = "/icons/icon-192.png";
 
@@ -51,6 +53,78 @@ function sanitizeNotificationRoute(value) {
   return pathname;
 }
 
+function normalizeCount(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.max(0, Math.floor(value));
+}
+
+async function readStoredBadgeCount() {
+  try {
+    const cache = await caches.open(BADGE_CACHE);
+    const response = await cache.match(BADGE_COUNT_URL);
+
+    if (!response) {
+      return 0;
+    }
+
+    const text = await response.text();
+    return normalizeCount(Number(text)) ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function writeStoredBadgeCount(count) {
+  try {
+    const cache = await caches.open(BADGE_CACHE);
+    await cache.put(BADGE_COUNT_URL, new Response(String(count), { status: 200 }));
+  } catch {
+    // Ignore storage failures; badge API may still succeed.
+  }
+}
+
+async function applyAppBadge(count) {
+  try {
+    if (count <= 0) {
+      if (typeof self.registration.clearAppBadge === "function") {
+        await self.registration.clearAppBadge();
+      }
+
+      await writeStoredBadgeCount(0);
+      return;
+    }
+
+    if (typeof self.registration.setAppBadge === "function") {
+      await self.registration.setAppBadge(count);
+    }
+
+    await writeStoredBadgeCount(count);
+  } catch {
+    // Badge API unsupported or failed — never break push display.
+  }
+}
+
+async function updateAppBadgeFromPayload(payload) {
+  const unreadCount = normalizeCount(payload.unreadCount);
+
+  if (unreadCount !== null) {
+    await applyAppBadge(unreadCount);
+    return;
+  }
+
+  const badgeDelta = normalizeCount(payload.badgeDelta);
+
+  if (badgeDelta === null || badgeDelta <= 0) {
+    return;
+  }
+
+  const current = await readStoredBadgeCount();
+  await applyAppBadge(current + badgeDelta);
+}
+
 function parsePushPayload(rawData) {
   if (!rawData) {
     return {
@@ -58,6 +132,8 @@ function parsePushPayload(rawData) {
       body: "",
       url: "/dashboard",
       tag: "nextlevel-notification",
+      unreadCount: null,
+      badgeDelta: null,
     };
   }
 
@@ -73,6 +149,8 @@ function parsePushPayload(rawData) {
         typeof payload.tag === "string"
           ? payload.tag.slice(0, 64)
           : sanitizeNotificationRoute(payload.url ?? payload.data?.url),
+      unreadCount: normalizeCount(payload.unreadCount ?? payload.data?.unreadCount),
+      badgeDelta: normalizeCount(payload.badgeDelta ?? payload.data?.badgeDelta),
     };
   } catch {
     return {
@@ -80,6 +158,8 @@ function parsePushPayload(rawData) {
       body: "",
       url: "/dashboard",
       tag: "nextlevel-notification",
+      unreadCount: null,
+      badgeDelta: null,
     };
   }
 }
@@ -95,7 +175,12 @@ self.addEventListener("activate", (event) => {
 
       await Promise.all(
         cacheNames
-          .filter((cacheName) => cacheName.startsWith("nextlevel-static-") && cacheName !== STATIC_CACHE)
+          .filter(
+            (cacheName) =>
+              cacheName.startsWith("nextlevel-static-") &&
+              cacheName !== STATIC_CACHE &&
+              cacheName !== BADGE_CACHE,
+          )
           .map((cacheName) => caches.delete(cacheName)),
       );
 
@@ -109,6 +194,8 @@ self.addEventListener("push", (event) => {
     (async () => {
       const payload = parsePushPayload(event.data);
 
+      await updateAppBadgeFromPayload(payload);
+
       await self.registration.showNotification(payload.title, {
         body: payload.body,
         icon: NOTIFICATION_ICON,
@@ -117,6 +204,8 @@ self.addEventListener("push", (event) => {
         renotify: false,
         data: {
           url: payload.url,
+          unreadCount: payload.unreadCount,
+          badgeDelta: payload.badgeDelta,
         },
       });
     })(),
