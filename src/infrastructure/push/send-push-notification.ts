@@ -19,6 +19,8 @@ export type PushSendSummary = {
   sent: number;
   failed: number;
   removedExpired: number;
+  subscriptionsFound: number;
+  recipientCount: number;
 };
 
 type PushSubscriptionRow = {
@@ -391,6 +393,8 @@ async function sendToSubscriptions(
     sent: 0,
     failed: 0,
     removedExpired: 0,
+    subscriptionsFound: subscriptions.length,
+    recipientCount: context.recipientCount,
   };
   const failures: PushDeliveryFailure[] = [];
 
@@ -405,6 +409,8 @@ async function sendToSubscriptions(
       sent: 0,
       failed: subscriptions.length,
       removedExpired: 0,
+      subscriptionsFound: subscriptions.length,
+      recipientCount: context.recipientCount,
     };
   }
 
@@ -450,7 +456,13 @@ export async function sendPushToUsers(
 
   if (!validatedPayload) {
     console.error("[push] invalid payload", { eventType, recipientCount: userIds.length });
-    return { sent: 0, failed: 0, removedExpired: 0 };
+    return {
+      sent: 0,
+      failed: 0,
+      removedExpired: 0,
+      subscriptionsFound: 0,
+      recipientCount: userIds.length,
+    };
   }
 
   if (!isPushConfigured()) {
@@ -458,7 +470,13 @@ export async function sendPushToUsers(
       eventType,
       recipientCount: userIds.length,
     });
-    return { sent: 0, failed: 0, removedExpired: 0 };
+    return {
+      sent: 0,
+      failed: 0,
+      removedExpired: 0,
+      subscriptionsFound: 0,
+      recipientCount: userIds.length,
+    };
   }
 
   if (userIds.length === 0) {
@@ -471,7 +489,13 @@ export async function sendPushToUsers(
       removedExpired: 0,
       failures: [],
     });
-    return { sent: 0, failed: 0, removedExpired: 0 };
+    return {
+      sent: 0,
+      failed: 0,
+      removedExpired: 0,
+      subscriptionsFound: 0,
+      recipientCount: 0,
+    };
   }
 
   const uniqueUserIds = [...new Set(userIds)];
@@ -487,7 +511,13 @@ export async function sendPushToUsers(
       removedExpired: 0,
       failures: [],
     });
-    return { sent: 0, failed: 0, removedExpired: 0 };
+    return {
+      sent: 0,
+      failed: 0,
+      removedExpired: 0,
+      subscriptionsFound: 0,
+      recipientCount: uniqueUserIds.length,
+    };
   }
 
   return sendToSubscriptions(subscriptions, validatedPayload, {

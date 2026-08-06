@@ -138,24 +138,29 @@ function buildInsertRow(userId: string, payload: UserNotificationPayload) {
 export type NotificationInsertSummary = {
   recipientCount: number;
   insertedCount: number;
+  attemptedCount: number;
+  failedCount: number;
 };
 
 async function insertNotificationBatch(
   rows: ReturnType<typeof buildInsertRow>[],
-): Promise<number> {
+): Promise<{ insertedCount: number; failedCount: number; attemptedCount: number }> {
   if (rows.length === 0) {
-    return 0;
+    return { insertedCount: 0, failedCount: 0, attemptedCount: 0 };
   }
 
   const admin = createAdminClient();
   let insertedCount = 0;
+  let failedCount = 0;
+  const attemptedCount = rows.length;
 
   for (let index = 0; index < rows.length; index += INSERT_BATCH_SIZE) {
     const batch = rows.slice(index, index + INSERT_BATCH_SIZE);
 
-    const { error } = await admin
+    const { data, error } = await admin
       .from("user_notifications")
-      .upsert(batch as never, { onConflict: "user_id,event_key", ignoreDuplicates: true });
+      .upsert(batch as never, { onConflict: "user_id,event_key", ignoreDuplicates: true })
+      .select("id");
 
     if (error) {
       console.error("[notifications] Failed to insert user notifications batch", {
@@ -164,15 +169,149 @@ async function insertNotificationBatch(
         message: error.message,
         batchSize: batch.length,
       });
+      failedCount += batch.length;
       continue;
     }
 
-    // Upsert with ignoreDuplicates does not reliably return row counts; treat a
-    // successful batch write as attempted recipient coverage for diagnostics.
-    insertedCount += batch.length;
+    // ON CONFLICT DO NOTHING RETURNING only returns newly inserted rows.
+    insertedCount += data?.length ?? 0;
   }
 
-  return insertedCount;
+  return { insertedCount, failedCount, attemptedCount };
+}
+
+export async function resolveActiveAdminIds(): Promise<string[]> {
+  return getActiveAdminIds();
+}
+
+export async function createNotificationsForAdminIds(
+  adminIds: string[],
+  base: Omit<UserNotificationPayload, "event_key">,
+  buildEventKey: (adminId: string) => string,
+): Promise<NotificationInsertSummary> {
+  if (!isInternalUrl(base.url)) {
+    console.error("[notifications] Skipped admin notifications: invalid internal url", {
+      stage: "create_in_app",
+    });
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
+  }
+
+  if (adminIds.length === 0) {
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
+  }
+
+  try {
+    const rows = adminIds.map((userId) =>
+      buildInsertRow(userId, {
+        ...base,
+        event_key: buildEventKey(userId),
+      }),
+    );
+    const result = await insertNotificationBatch(rows);
+
+    return {
+      recipientCount: adminIds.length,
+      insertedCount: result.insertedCount,
+      attemptedCount: result.attemptedCount,
+      failedCount: result.failedCount,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[notifications] Failed to create admin notifications for IDs", {
+      stage: "create_in_app",
+      message,
+      recipientCount: adminIds.length,
+    });
+    return {
+      recipientCount: adminIds.length,
+      insertedCount: 0,
+      attemptedCount: adminIds.length,
+      failedCount: adminIds.length,
+    };
+  }
+}
+
+export async function countUnreadQuestionMessagesForAdmin(
+  adminId: string,
+): Promise<number> {
+  if (!adminId) {
+    return 0;
+  }
+
+  const client = createAdminClient();
+
+  const [
+    { data: questions, error: questionsError },
+    { data: messages, error: messagesError },
+    { data: reads, error: readsError },
+  ] = await Promise.all([
+    client.from("questions").select("id, user_id"),
+    client.from("question_messages").select("id, question_id, sender_id, created_at"),
+    client
+      .from("question_chat_reads")
+      .select("question_id, last_read_at")
+      .eq("user_id", adminId),
+  ]);
+
+  if (questionsError) {
+    console.error("[notifications] Failed to load questions for admin unread count", {
+      stage: "admin_unread_count",
+      code: questionsError.code ?? null,
+      message: questionsError.message,
+    });
+    return 0;
+  }
+
+  if (messagesError) {
+    console.error("[notifications] Failed to count admin unread messages", {
+      stage: "admin_unread_count",
+      code: messagesError.code ?? null,
+      message: messagesError.message,
+    });
+    return 0;
+  }
+
+  if (readsError) {
+    console.error("[notifications] Failed to load admin chat reads for unread count", {
+      stage: "admin_unread_count",
+      code: readsError.code ?? null,
+      message: readsError.message,
+    });
+  }
+
+  const ownerByQuestion = new Map<string, string>();
+
+  for (const question of (questions ?? []) as Array<{ id: string; user_id: string }>) {
+    ownerByQuestion.set(question.id, question.user_id);
+  }
+
+  const lastReadByQuestion = new Map<string, string>();
+
+  for (const read of (reads ?? []) as Array<{ question_id: string; last_read_at: string }>) {
+    lastReadByQuestion.set(read.question_id, read.last_read_at);
+  }
+
+  let unread = 0;
+
+  for (const row of (messages ?? []) as Array<{
+    question_id: string;
+    sender_id: string;
+    created_at: string;
+  }>) {
+    const ownerId = ownerByQuestion.get(row.question_id);
+
+    if (!ownerId || row.sender_id !== ownerId) {
+      continue;
+    }
+
+    const lastReadAt = lastReadByQuestion.get(row.question_id);
+
+    if (!lastReadAt || new Date(row.created_at).getTime() > new Date(lastReadAt).getTime()) {
+      unread += 1;
+    }
+  }
+
+  return unread;
 }
 
 export async function createNotificationsForEmployees(
@@ -182,7 +321,7 @@ export async function createNotificationsForEmployees(
     console.error("[notifications] Skipped employee notifications: invalid internal url", {
       stage: "create_in_app",
     });
-    return { recipientCount: 0, insertedCount: 0 };
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
   }
 
   try {
@@ -192,27 +331,34 @@ export async function createNotificationsForEmployees(
       console.error("[notifications] No active employees found for notifications", {
         stage: "find_employees",
       });
-      return { recipientCount: 0, insertedCount: 0 };
+      return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
     }
 
     const rows = employeeIds.map((userId) => buildInsertRow(userId, payload));
-    const insertedCount = await insertNotificationBatch(rows);
+    const result = await insertNotificationBatch(rows);
 
     console.info("[notifications] Employee in-app notifications created", {
       stage: "create_in_app",
       recipientCount: employeeIds.length,
-      insertedCount,
+      insertedCount: result.insertedCount,
+      attemptedCount: result.attemptedCount,
+      failedCount: result.failedCount,
       type: payload.type,
     });
 
-    return { recipientCount: employeeIds.length, insertedCount };
+    return {
+      recipientCount: employeeIds.length,
+      insertedCount: result.insertedCount,
+      attemptedCount: result.attemptedCount,
+      failedCount: result.failedCount,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[notifications] Failed to create employee notifications", {
       stage: "create_in_app",
       message,
     });
-    return { recipientCount: 0, insertedCount: 0 };
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
   }
 }
 
@@ -224,7 +370,7 @@ export async function createNotificationsForAdmins(
     console.error("[notifications] Skipped admin notifications: invalid internal url", {
       stage: "create_in_app",
     });
-    return { recipientCount: 0, insertedCount: 0 };
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
   }
 
   try {
@@ -236,27 +382,34 @@ export async function createNotificationsForAdmins(
       console.error("[notifications] Configuration error: zero active administrators found", {
         stage: "find_admins",
       });
-      return { recipientCount: 0, insertedCount: 0 };
+      return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
     }
 
     const rows = adminIds.map((userId) => buildInsertRow(userId, payload));
-    const insertedCount = await insertNotificationBatch(rows);
+    const result = await insertNotificationBatch(rows);
 
     console.info("[notifications] Admin in-app notifications created", {
       stage: "create_in_app",
       recipientCount: adminIds.length,
-      insertedCount,
+      insertedCount: result.insertedCount,
+      attemptedCount: result.attemptedCount,
+      failedCount: result.failedCount,
       type: payload.type,
     });
 
-    return { recipientCount: adminIds.length, insertedCount };
+    return {
+      recipientCount: adminIds.length,
+      insertedCount: result.insertedCount,
+      attemptedCount: result.attemptedCount,
+      failedCount: result.failedCount,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[notifications] Failed to create admin notifications", {
       stage: "create_in_app",
       message,
     });
-    return { recipientCount: 0, insertedCount: 0 };
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
   }
 }
 
@@ -269,7 +422,7 @@ export async function createNotificationsForAdminsWithPerUserEventKeys(
     console.error("[notifications] Skipped admin notifications: invalid internal url", {
       stage: "create_in_app",
     });
-    return { recipientCount: 0, insertedCount: 0 };
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
   }
 
   try {
@@ -281,32 +434,17 @@ export async function createNotificationsForAdminsWithPerUserEventKeys(
       console.error("[notifications] Configuration error: zero active administrators found", {
         stage: "find_admins",
       });
-      return { recipientCount: 0, insertedCount: 0 };
+      return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
     }
 
-    const rows = adminIds.map((userId) =>
-      buildInsertRow(userId, {
-        ...base,
-        event_key: buildEventKey(userId),
-      }),
-    );
-    const insertedCount = await insertNotificationBatch(rows);
-
-    console.info("[notifications] Per-admin in-app notifications created", {
-      stage: "create_in_app",
-      recipientCount: adminIds.length,
-      insertedCount,
-      type: base.type,
-    });
-
-    return { recipientCount: adminIds.length, insertedCount };
+    return createNotificationsForAdminIds(adminIds, base, buildEventKey);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[notifications] Failed to create per-admin notifications", {
       stage: "create_in_app",
       message,
     });
-    return { recipientCount: 0, insertedCount: 0 };
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
   }
 }
 
@@ -318,7 +456,7 @@ export async function createNotificationForUser(
     console.error("[notifications] Skipped user notification: invalid recipient or url", {
       stage: "create_in_app",
     });
-    return { recipientCount: 0, insertedCount: 0 };
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
   }
 
   try {
@@ -336,7 +474,7 @@ export async function createNotificationForUser(
         code: profileError?.code ?? null,
         message: profileError?.message ?? null,
       });
-      return { recipientCount: 0, insertedCount: 0 };
+      return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
     }
 
     const { data: authData, error: authError } = await admin.auth.admin.getUserById(userId);
@@ -346,26 +484,33 @@ export async function createNotificationForUser(
         stage: "create_in_app",
         message: authError?.message ?? null,
       });
-      return { recipientCount: 0, insertedCount: 0 };
+      return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
     }
 
-    const insertedCount = await insertNotificationBatch([buildInsertRow(userId, payload)]);
+    const result = await insertNotificationBatch([buildInsertRow(userId, payload)]);
 
     console.info("[notifications] User in-app notification created", {
       stage: "create_in_app",
       recipientCount: 1,
-      insertedCount,
+      insertedCount: result.insertedCount,
+      attemptedCount: result.attemptedCount,
+      failedCount: result.failedCount,
       type: payload.type,
     });
 
-    return { recipientCount: 1, insertedCount };
+    return {
+      recipientCount: 1,
+      insertedCount: result.insertedCount,
+      attemptedCount: result.attemptedCount,
+      failedCount: result.failedCount,
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[notifications] Failed to create user notification", {
       stage: "create_in_app",
       message,
     });
-    return { recipientCount: 0, insertedCount: 0 };
+    return { recipientCount: 0, insertedCount: 0, attemptedCount: 0, failedCount: 0 };
   }
 }
 

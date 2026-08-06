@@ -1,16 +1,18 @@
 import "server-only";
 
 import {
+  countUnreadQuestionMessagesForAdmin,
   createNotificationForUser,
-  createNotificationsForAdminsWithPerUserEventKeys,
+  createNotificationsForAdminIds,
   createNotificationsForEmployees,
+  resolveActiveAdminIds,
 } from "@/infrastructure/notifications/create-user-notifications";
 import { recordNotificationEvent } from "@/infrastructure/push/notification-events";
 import {
   getPushWarningFromSummary,
-  sendPushToAllAdmins,
   sendPushToAllEmployees,
   sendPushToUser,
+  sendPushToUsers,
 } from "@/infrastructure/push/send-push-notification";
 
 export async function notifyAnnouncementPublished(
@@ -153,60 +155,138 @@ export async function notifyAdminsQuestionMessage(
 
   if (!isFirstEvent) {
     console.info("[notifications] Skipping duplicate admin chat notification", {
-      stage: "record_event",
       messageId,
-      conversationId: questionId,
       senderRole: "employee",
+      adminRecipientsFound: 0,
+      inAppInsertAttempted: 0,
+      inAppInserted: 0,
+      inAppInsertFailed: 0,
+      pushSubscriptionsFound: 0,
+      pushSent: 0,
+      pushFailed: 0,
+      adminUnreadCountAfterSend: null,
+      reason: "duplicate_event_key",
     });
     return undefined;
   }
 
   const body = `${employeeLabel}: ${subject}`.trim().slice(0, 200);
 
-  console.info("[notifications] Notifying administrators about employee chat message", {
-    stage: "notify_admins",
-    messageId,
-    conversationId: questionId,
-    senderRole: "employee",
-  });
+  let adminRecipientsFound = 0;
+  let inAppInsertAttempted = 0;
+  let inAppInserted = 0;
+  let inAppInsertFailed = 0;
+  let pushSubscriptionsFound = 0;
+  let pushSent = 0;
+  let pushFailed = 0;
+  let adminUnreadCountAfterSend: number | null = null;
 
-  // Await both paths. Fire-and-forget `void` was cancelled on Vercel after the
-  // Server Action returned, so in-app Notification Center rows never persisted.
-  const [inAppSummary, summary] = await Promise.all([
-    createNotificationsForAdminsWithPerUserEventKeys(
-      {
-        type: "question_message",
-        title: "Нове повідомлення від менеджера",
-        body,
-        url: "/questions",
-        entity_id: questionId,
-      },
-      (adminId) => `question-message:${messageId}:admin:${adminId}`,
-    ),
-    sendPushToAllAdmins(
-      {
-        title: "Нове повідомлення від менеджера",
-        body,
-        url: "/questions",
-        tag: `question-message-${messageId}`,
-      },
-      { eventType: "question-message-admin" },
-    ),
-  ]);
+  try {
+    const adminIds = await resolveActiveAdminIds();
+    adminRecipientsFound = adminIds.length;
 
-  console.info("[notifications] Admin chat notification delivery finished", {
-    stage: "notify_admins",
-    messageId,
-    conversationId: questionId,
-    senderRole: "employee",
-    recipientCount: inAppSummary.recipientCount,
-    insertedCount: inAppSummary.insertedCount,
-    pushSent: summary.sent,
-    pushFailed: summary.failed,
-    pushRemovedExpired: summary.removedExpired,
-  });
+    if (adminIds.length === 0) {
+      console.error("[notifications] Admin chat notification aborted: no active administrators", {
+        messageId,
+        senderRole: "employee",
+        adminRecipientsFound: 0,
+        inAppInsertAttempted: 0,
+        inAppInserted: 0,
+        inAppInsertFailed: 0,
+        pushSubscriptionsFound: 0,
+        pushSent: 0,
+        pushFailed: 0,
+        adminUnreadCountAfterSend: null,
+      });
+      return undefined;
+    }
 
-  return getPushWarningFromSummary(summary);
+    const [inAppSummary, pushSummary] = await Promise.all([
+      createNotificationsForAdminIds(
+        adminIds,
+        {
+          type: "question_message",
+          title: "Нове повідомлення від менеджера",
+          body,
+          url: "/questions",
+          entity_id: questionId,
+        },
+        (adminId) => `question-message:${messageId}:admin:${adminId}`,
+      ),
+      sendPushToUsers(
+        adminIds,
+        {
+          title: "Нове повідомлення від менеджера",
+          body,
+          url: "/questions",
+          tag: `question-message-${messageId}`,
+        },
+        { eventType: "question-message-admin" },
+      ),
+    ]);
+
+    inAppInsertAttempted = inAppSummary.attemptedCount;
+    inAppInserted = inAppSummary.insertedCount;
+    inAppInsertFailed = inAppSummary.failedCount;
+    pushSubscriptionsFound = pushSummary.subscriptionsFound;
+    pushSent = pushSummary.sent;
+    pushFailed = pushSummary.failed;
+
+    adminUnreadCountAfterSend = await countUnreadQuestionMessagesForAdmin(adminIds[0]);
+
+    console.info("[notifications] Admin chat notification result", {
+      messageId,
+      senderRole: "employee",
+      adminRecipientsFound,
+      inAppInsertAttempted,
+      inAppInserted,
+      inAppInsertFailed,
+      pushSubscriptionsFound,
+      pushSent,
+      pushFailed,
+      adminUnreadCountAfterSend,
+    });
+
+    if (inAppInserted === 0 && inAppInsertFailed > 0) {
+      console.error("[notifications] Admin in-app notification insert failed for all recipients", {
+        messageId,
+        senderRole: "employee",
+        adminRecipientsFound,
+        inAppInsertAttempted,
+        inAppInserted,
+        inAppInsertFailed,
+      });
+    }
+
+    if (pushSubscriptionsFound === 0) {
+      console.info("[notifications] Admin push subscriptions found: 0 (not counted as delivery)", {
+        messageId,
+        senderRole: "employee",
+        adminRecipientsFound,
+        pushSubscriptionsFound: 0,
+        pushSent: 0,
+        pushFailed: 0,
+      });
+    }
+
+    return getPushWarningFromSummary(pushSummary);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[notifications] Admin chat notification threw", {
+      messageId,
+      senderRole: "employee",
+      adminRecipientsFound,
+      inAppInsertAttempted,
+      inAppInserted,
+      inAppInsertFailed,
+      pushSubscriptionsFound,
+      pushSent,
+      pushFailed,
+      adminUnreadCountAfterSend,
+      errorMessage: message,
+    });
+    return undefined;
+  }
 }
 
 export async function notifyDocumentCreated(
