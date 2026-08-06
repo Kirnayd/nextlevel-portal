@@ -14,7 +14,7 @@ import {
 } from "@/infrastructure/push/triggers";
 import { createAdminClient } from "@/infrastructure/supabase/admin";
 import { createClient } from "@/infrastructure/supabase/server";
-import { getAuthenticatedUser, isAdmin } from "@/shared/lib/auth";
+import { getAuthenticatedUser, getUserRole, isAdmin } from "@/shared/lib/auth";
 import type { Enums, Tables, TablesInsert } from "@/shared/types/database.types";
 
 export type Question = Tables<"questions">;
@@ -486,18 +486,36 @@ export async function createQuestion(formData: FormData): Promise<ActionResult> 
   let pushWarning: string | undefined;
 
   try {
-    const authorProfiles = await loadAuthors([user.id]);
-    const author = authorProfiles.get(user.id);
-    const authorLabel = author?.full_name?.trim() || author?.email?.trim() || "менеджер";
+    const senderRole = await getUserRole(user.id);
 
-    pushWarning = await notifyAdminsQuestionMessage(
-      (savedMessage as QuestionMessage).id,
-      questionId,
-      subject,
-      authorLabel,
-    );
+    if (senderRole !== "employee") {
+      console.error("[notifications] Unexpected sender role after employee createQuestion", {
+        stage: "notify_admins",
+        messageId: (savedMessage as QuestionMessage).id,
+        conversationId: questionId,
+        senderRole,
+      });
+    } else {
+      const authorProfiles = await loadAuthors([user.id]);
+      const author = authorProfiles.get(user.id);
+      const authorLabel = author?.full_name?.trim() || author?.email?.trim() || "менеджер";
+
+      pushWarning = await notifyAdminsQuestionMessage(
+        (savedMessage as QuestionMessage).id,
+        questionId,
+        subject,
+        authorLabel,
+      );
+    }
   } catch (error) {
-    console.error("Employee chat message notification failed:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[notifications] Employee chat message notification failed", {
+      stage: "notify_admins",
+      messageId: (savedMessage as QuestionMessage).id,
+      conversationId: questionId,
+      senderRole: "employee",
+      message,
+    });
   }
 
   return {
@@ -534,7 +552,12 @@ export async function sendQuestionMessage(
   }
 
   const supabase = await createClient();
-  const userIsAdmin = await isAdmin(user.id);
+  const senderRole = await getUserRole(user.id);
+  const userIsAdmin = senderRole === "admin";
+
+  if (!senderRole) {
+    return { success: false, error: "Не вдалося визначити роль користувача." };
+  }
 
   const { data: question, error: questionError } = await supabase
     .from("questions")
@@ -575,6 +598,7 @@ export async function sendQuestionMessage(
   }
 
   const now = (savedMessage as QuestionMessage).created_at;
+  const messageId = (savedMessage as QuestionMessage).id;
 
   await supabase.from("question_chat_reads").upsert(
     {
@@ -598,9 +622,9 @@ export async function sendQuestionMessage(
   let pushWarning: string | undefined;
 
   try {
-    if (userIsAdmin) {
+    if (senderRole === "admin") {
       pushWarning = await notifyEmployeeQuestionMessage(
-        (savedMessage as QuestionMessage).id,
+        messageId,
         questionId,
         conversation.user_id,
         conversation.subject,
@@ -611,14 +635,21 @@ export async function sendQuestionMessage(
       const authorLabel = author?.full_name?.trim() || author?.email?.trim() || "менеджер";
 
       pushWarning = await notifyAdminsQuestionMessage(
-        (savedMessage as QuestionMessage).id,
+        messageId,
         questionId,
         conversation.subject,
         authorLabel,
       );
     }
   } catch (error) {
-    console.error("Chat message notification failed:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[notifications] Chat message notification failed", {
+      stage: senderRole === "admin" ? "notify_employee" : "notify_admins",
+      messageId,
+      conversationId: questionId,
+      senderRole,
+      message,
+    });
   }
 
   return {

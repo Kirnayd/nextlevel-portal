@@ -85,7 +85,11 @@ async function getActiveAdminIds(): Promise<string[]> {
   const { data: profiles, error } = await admin.from("profiles").select("id").eq("role", "admin");
 
   if (error) {
-    console.error("Failed to load admin profiles for notifications:", error.message);
+    console.error("[notifications] Failed to load admin profiles", {
+      stage: "find_admins",
+      code: error.code ?? null,
+      message: error.message,
+    });
     return [];
   }
 
@@ -100,6 +104,20 @@ async function getActiveAdminIds(): Promise<string[]> {
     }
 
     activeIds.push(userId);
+  }
+
+  console.info("[notifications] Active administrators resolved", {
+    stage: "find_admins",
+    administratorsFoundCount: adminIds.length,
+    activeAdministratorIdsCount: activeIds.length,
+  });
+
+  if (adminIds.length > 0 && activeIds.length === 0) {
+    console.error("[notifications] Configuration error: admin profiles exist but none are active", {
+      stage: "find_admins",
+      administratorsFoundCount: adminIds.length,
+      activeAdministratorIdsCount: 0,
+    });
   }
 
   return activeIds;
@@ -117,14 +135,20 @@ function buildInsertRow(userId: string, payload: UserNotificationPayload) {
   };
 }
 
+export type NotificationInsertSummary = {
+  recipientCount: number;
+  insertedCount: number;
+};
+
 async function insertNotificationBatch(
   rows: ReturnType<typeof buildInsertRow>[],
-): Promise<void> {
+): Promise<number> {
   if (rows.length === 0) {
-    return;
+    return 0;
   }
 
   const admin = createAdminClient();
+  let insertedCount = 0;
 
   for (let index = 0; index < rows.length; index += INSERT_BATCH_SIZE) {
     const batch = rows.slice(index, index + INSERT_BATCH_SIZE);
@@ -134,39 +158,73 @@ async function insertNotificationBatch(
       .upsert(batch as never, { onConflict: "user_id,event_key", ignoreDuplicates: true });
 
     if (error) {
-      console.error("Failed to insert user notifications batch:", error.message);
+      console.error("[notifications] Failed to insert user notifications batch", {
+        stage: "create_in_app",
+        code: error.code ?? null,
+        message: error.message,
+        batchSize: batch.length,
+      });
+      continue;
     }
+
+    // Upsert with ignoreDuplicates does not reliably return row counts; treat a
+    // successful batch write as attempted recipient coverage for diagnostics.
+    insertedCount += batch.length;
   }
+
+  return insertedCount;
 }
 
-export async function createNotificationsForEmployees(payload: UserNotificationPayload): Promise<void> {
+export async function createNotificationsForEmployees(
+  payload: UserNotificationPayload,
+): Promise<NotificationInsertSummary> {
   if (!isInternalUrl(payload.url)) {
-    console.error("Skipped employee notifications: invalid internal url");
-    return;
+    console.error("[notifications] Skipped employee notifications: invalid internal url", {
+      stage: "create_in_app",
+    });
+    return { recipientCount: 0, insertedCount: 0 };
   }
 
   try {
     const employeeIds = await getActiveEmployeeIds();
 
     if (employeeIds.length === 0) {
-      return;
+      console.error("[notifications] No active employees found for notifications", {
+        stage: "find_employees",
+      });
+      return { recipientCount: 0, insertedCount: 0 };
     }
 
     const rows = employeeIds.map((userId) => buildInsertRow(userId, payload));
-    await insertNotificationBatch(rows);
+    const insertedCount = await insertNotificationBatch(rows);
+
+    console.info("[notifications] Employee in-app notifications created", {
+      stage: "create_in_app",
+      recipientCount: employeeIds.length,
+      insertedCount,
+      type: payload.type,
+    });
+
+    return { recipientCount: employeeIds.length, insertedCount };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Failed to create employee notifications:", message);
+    console.error("[notifications] Failed to create employee notifications", {
+      stage: "create_in_app",
+      message,
+    });
+    return { recipientCount: 0, insertedCount: 0 };
   }
 }
 
 export async function createNotificationsForAdmins(
   payload: UserNotificationPayload,
   options?: { excludeUserId?: string },
-): Promise<void> {
+): Promise<NotificationInsertSummary> {
   if (!isInternalUrl(payload.url)) {
-    console.error("Skipped admin notifications: invalid internal url");
-    return;
+    console.error("[notifications] Skipped admin notifications: invalid internal url", {
+      stage: "create_in_app",
+    });
+    return { recipientCount: 0, insertedCount: 0 };
   }
 
   try {
@@ -175,14 +233,30 @@ export async function createNotificationsForAdmins(
     );
 
     if (adminIds.length === 0) {
-      return;
+      console.error("[notifications] Configuration error: zero active administrators found", {
+        stage: "find_admins",
+      });
+      return { recipientCount: 0, insertedCount: 0 };
     }
 
     const rows = adminIds.map((userId) => buildInsertRow(userId, payload));
-    await insertNotificationBatch(rows);
+    const insertedCount = await insertNotificationBatch(rows);
+
+    console.info("[notifications] Admin in-app notifications created", {
+      stage: "create_in_app",
+      recipientCount: adminIds.length,
+      insertedCount,
+      type: payload.type,
+    });
+
+    return { recipientCount: adminIds.length, insertedCount };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Failed to create admin notifications:", message);
+    console.error("[notifications] Failed to create admin notifications", {
+      stage: "create_in_app",
+      message,
+    });
+    return { recipientCount: 0, insertedCount: 0 };
   }
 }
 
@@ -190,10 +264,12 @@ export async function createNotificationsForAdminsWithPerUserEventKeys(
   base: Omit<UserNotificationPayload, "event_key">,
   buildEventKey: (adminId: string) => string,
   options?: { excludeUserId?: string },
-): Promise<void> {
+): Promise<NotificationInsertSummary> {
   if (!isInternalUrl(base.url)) {
-    console.error("Skipped admin notifications: invalid internal url");
-    return;
+    console.error("[notifications] Skipped admin notifications: invalid internal url", {
+      stage: "create_in_app",
+    });
+    return { recipientCount: 0, insertedCount: 0 };
   }
 
   try {
@@ -202,7 +278,10 @@ export async function createNotificationsForAdminsWithPerUserEventKeys(
     );
 
     if (adminIds.length === 0) {
-      return;
+      console.error("[notifications] Configuration error: zero active administrators found", {
+        stage: "find_admins",
+      });
+      return { recipientCount: 0, insertedCount: 0 };
     }
 
     const rows = adminIds.map((userId) =>
@@ -211,20 +290,35 @@ export async function createNotificationsForAdminsWithPerUserEventKeys(
         event_key: buildEventKey(userId),
       }),
     );
-    await insertNotificationBatch(rows);
+    const insertedCount = await insertNotificationBatch(rows);
+
+    console.info("[notifications] Per-admin in-app notifications created", {
+      stage: "create_in_app",
+      recipientCount: adminIds.length,
+      insertedCount,
+      type: base.type,
+    });
+
+    return { recipientCount: adminIds.length, insertedCount };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Failed to create per-admin notifications:", message);
+    console.error("[notifications] Failed to create per-admin notifications", {
+      stage: "create_in_app",
+      message,
+    });
+    return { recipientCount: 0, insertedCount: 0 };
   }
 }
 
 export async function createNotificationForUser(
   userId: string,
   payload: UserNotificationPayload,
-): Promise<void> {
+): Promise<NotificationInsertSummary> {
   if (!userId || !isInternalUrl(payload.url)) {
-    console.error("Skipped user notification: invalid recipient or url");
-    return;
+    console.error("[notifications] Skipped user notification: invalid recipient or url", {
+      stage: "create_in_app",
+    });
+    return { recipientCount: 0, insertedCount: 0 };
   }
 
   try {
@@ -237,21 +331,41 @@ export async function createNotificationForUser(
       .maybeSingle();
 
     if (profileError || !profile) {
-      console.error("Skipped user notification: recipient profile not found");
-      return;
+      console.error("[notifications] Skipped user notification: recipient profile not found", {
+        stage: "create_in_app",
+        code: profileError?.code ?? null,
+        message: profileError?.message ?? null,
+      });
+      return { recipientCount: 0, insertedCount: 0 };
     }
 
     const { data: authData, error: authError } = await admin.auth.admin.getUserById(userId);
 
     if (authError || !authData.user || isAuthUserBlocked(authData.user)) {
-      console.error("Skipped user notification: recipient inactive or blocked");
-      return;
+      console.error("[notifications] Skipped user notification: recipient inactive or blocked", {
+        stage: "create_in_app",
+        message: authError?.message ?? null,
+      });
+      return { recipientCount: 0, insertedCount: 0 };
     }
 
-    await insertNotificationBatch([buildInsertRow(userId, payload)]);
+    const insertedCount = await insertNotificationBatch([buildInsertRow(userId, payload)]);
+
+    console.info("[notifications] User in-app notification created", {
+      stage: "create_in_app",
+      recipientCount: 1,
+      insertedCount,
+      type: payload.type,
+    });
+
+    return { recipientCount: 1, insertedCount };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Failed to create user notification:", message);
+    console.error("[notifications] Failed to create user notification", {
+      stage: "create_in_app",
+      message,
+    });
+    return { recipientCount: 0, insertedCount: 0 };
   }
 }
 

@@ -273,7 +273,11 @@ async function getActiveAdminIds(): Promise<string[]> {
   const { data: profiles, error } = await admin.from("profiles").select("id").eq("role", "admin");
 
   if (error) {
-    console.error("Failed to load admin profiles for push:", error.message);
+    console.error("[push] Failed to load admin profiles", {
+      stage: "find_admins",
+      code: error.code ?? null,
+      message: error.message,
+    });
     return [];
   }
 
@@ -288,6 +292,18 @@ async function getActiveAdminIds(): Promise<string[]> {
     }
 
     activeIds.push(userId);
+  }
+
+  console.info("[push] Active administrators resolved", {
+    stage: "find_admins",
+    administratorsFoundCount: adminIds.length,
+    activeAdministratorIdsCount: activeIds.length,
+  });
+
+  if (adminIds.length === 0) {
+    console.error("[push] Configuration error: zero administrators found", {
+      stage: "find_admins",
+    });
   }
 
   return activeIds;

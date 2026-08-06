@@ -28,24 +28,27 @@ export async function notifyAnnouncementPublished(
     return undefined;
   }
 
-  void createNotificationsForEmployees({
-    type: "announcement",
-    title: "Нове оголошення",
-    body: title.trim().slice(0, 200),
-    url: "/announcements",
-    entity_id: announcementId,
-    event_key: `announcement:${announcementId}`,
-  });
+  const body = title.trim().slice(0, 200);
 
-  const summary = await sendPushToAllEmployees(
-    {
+  const [, summary] = await Promise.all([
+    createNotificationsForEmployees({
+      type: "announcement",
       title: "Нове оголошення",
-      body: title.trim().slice(0, 200),
+      body,
       url: "/announcements",
-      tag: `announcement-${announcementId}`,
-    },
-    { eventType: "announcement-published" },
-  );
+      entity_id: announcementId,
+      event_key: `announcement:${announcementId}`,
+    }),
+    sendPushToAllEmployees(
+      {
+        title: "Нове оголошення",
+        body,
+        url: "/announcements",
+        tag: `announcement-${announcementId}`,
+      },
+      { eventType: "announcement-published" },
+    ),
+  ]);
 
   return getPushWarningFromSummary(summary);
 }
@@ -61,24 +64,25 @@ export async function notifyPriceUpdated(
     return undefined;
   }
 
-  void createNotificationsForEmployees({
-    type: "price",
-    title: "Оновлено прайс",
-    body: "Доступна нова версія прайсу.",
-    url: "/price",
-    entity_id: fileId,
-    event_key: `price:${fileId}:${updatedAt}`,
-  });
-
-  const summary = await sendPushToAllEmployees(
-    {
+  const [, summary] = await Promise.all([
+    createNotificationsForEmployees({
+      type: "price",
       title: "Оновлено прайс",
       body: "Доступна нова версія прайсу.",
       url: "/price",
-      tag: `price-${fileId}`,
-    },
-    { eventType: "price-updated" },
-  );
+      entity_id: fileId,
+      event_key: `price:${fileId}:${updatedAt}`,
+    }),
+    sendPushToAllEmployees(
+      {
+        title: "Оновлено прайс",
+        body: "Доступна нова версія прайсу.",
+        url: "/price",
+        tag: `price-${fileId}`,
+      },
+      { eventType: "price-updated" },
+    ),
+  ]);
 
   return getPushWarningFromSummary(summary);
 }
@@ -107,25 +111,33 @@ export async function notifyEmployeeQuestionMessage(
 
   const body = subject.trim().slice(0, 200);
 
-  void createNotificationForUser(questionUserId, {
-    type: "question_message",
-    title: "Нове повідомлення адміністратора",
-    body,
-    url: "/questions",
-    entity_id: questionId,
-    event_key: `question-message:${messageId}:employee:${questionUserId}`,
+  console.info("[notifications] Notifying employee about admin chat message", {
+    stage: "notify_employee",
+    messageId,
+    conversationId: questionId,
+    senderRole: "admin",
   });
 
-  const summary = await sendPushToUser(
-    questionUserId,
-    {
+  const [, summary] = await Promise.all([
+    createNotificationForUser(questionUserId, {
+      type: "question_message",
       title: "Нове повідомлення адміністратора",
       body,
       url: "/questions",
-      tag: `question-message-${messageId}`,
-    },
-    { eventType: "question-message-employee" },
-  );
+      entity_id: questionId,
+      event_key: `question-message:${messageId}:employee:${questionUserId}`,
+    }),
+    sendPushToUser(
+      questionUserId,
+      {
+        title: "Нове повідомлення адміністратора",
+        body,
+        url: "/questions",
+        tag: `question-message-${messageId}`,
+      },
+      { eventType: "question-message-employee" },
+    ),
+  ]);
 
   return getPushWarningFromSummary(summary);
 }
@@ -140,31 +152,59 @@ export async function notifyAdminsQuestionMessage(
   const isFirstEvent = await recordNotificationEvent(eventKey, "question-message", messageId);
 
   if (!isFirstEvent) {
+    console.info("[notifications] Skipping duplicate admin chat notification", {
+      stage: "record_event",
+      messageId,
+      conversationId: questionId,
+      senderRole: "employee",
+    });
     return undefined;
   }
 
   const body = `${employeeLabel}: ${subject}`.trim().slice(0, 200);
 
-  void createNotificationsForAdminsWithPerUserEventKeys(
-    {
-      type: "question_message",
-      title: "Нове повідомлення від менеджера",
-      body,
-      url: "/questions",
-      entity_id: questionId,
-    },
-    (adminId) => `question-message:${messageId}:admin:${adminId}`,
-  );
+  console.info("[notifications] Notifying administrators about employee chat message", {
+    stage: "notify_admins",
+    messageId,
+    conversationId: questionId,
+    senderRole: "employee",
+  });
 
-  const summary = await sendPushToAllAdmins(
-    {
-      title: "Нове повідомлення від менеджера",
-      body,
-      url: "/questions",
-      tag: `question-message-${messageId}`,
-    },
-    { eventType: "question-message-admin" },
-  );
+  // Await both paths. Fire-and-forget `void` was cancelled on Vercel after the
+  // Server Action returned, so in-app Notification Center rows never persisted.
+  const [inAppSummary, summary] = await Promise.all([
+    createNotificationsForAdminsWithPerUserEventKeys(
+      {
+        type: "question_message",
+        title: "Нове повідомлення від менеджера",
+        body,
+        url: "/questions",
+        entity_id: questionId,
+      },
+      (adminId) => `question-message:${messageId}:admin:${adminId}`,
+    ),
+    sendPushToAllAdmins(
+      {
+        title: "Нове повідомлення від менеджера",
+        body,
+        url: "/questions",
+        tag: `question-message-${messageId}`,
+      },
+      { eventType: "question-message-admin" },
+    ),
+  ]);
+
+  console.info("[notifications] Admin chat notification delivery finished", {
+    stage: "notify_admins",
+    messageId,
+    conversationId: questionId,
+    senderRole: "employee",
+    recipientCount: inAppSummary.recipientCount,
+    insertedCount: inAppSummary.insertedCount,
+    pushSent: summary.sent,
+    pushFailed: summary.failed,
+    pushRemovedExpired: summary.removedExpired,
+  });
 
   return getPushWarningFromSummary(summary);
 }
@@ -196,24 +236,25 @@ export async function notifyDocumentCreated(
     body = `${trimmedTitle} · ${trimmedSubcategory}`;
   }
 
-  void createNotificationsForEmployees({
-    type: "document",
-    title: "Новий документ",
-    body: body.slice(0, 200),
-    url: "/documents",
-    entity_id: documentId,
-    event_key: `document:${documentId}`,
-  });
-
-  const summary = await sendPushToAllEmployees(
-    {
+  const [, summary] = await Promise.all([
+    createNotificationsForEmployees({
+      type: "document",
       title: "Новий документ",
       body: body.slice(0, 200),
       url: "/documents",
-      tag: `document-${documentId}`,
-    },
-    { eventType: "document-created" },
-  );
+      entity_id: documentId,
+      event_key: `document:${documentId}`,
+    }),
+    sendPushToAllEmployees(
+      {
+        title: "Новий документ",
+        body: body.slice(0, 200),
+        url: "/documents",
+        tag: `document-${documentId}`,
+      },
+      { eventType: "document-created" },
+    ),
+  ]);
 
   return getPushWarningFromSummary(summary);
 }
